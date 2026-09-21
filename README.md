@@ -4,9 +4,9 @@ Webgame tiếng Việt dành cho lớp học Tư tưởng Hồ Chí Minh. Ngư�
 
 ## Chạy trong lớp
 
-Máy tính cần [Node.js 20 trở lên](https://nodejs.org/). Trên Windows, nhấp đúp **`start-game.bat`**, sau đó mở `http://localhost:3000` trên máy người dẫn. Hoặc chạy `npm start` trong thư mục này. Cửa sổ máy chủ sẽ hiển thị mật khẩu người dẫn gồm 6 số; mật khẩu này được yêu cầu khi tạo phòng hoặc mở chế độ chơi thử.
+Máy tính cần [Node.js 20 trở lên](https://nodejs.org/). Trên Windows, nhấp đúp **`start-game.bat`**, sau đó mở `http://localhost:3000` trên máy người dẫn. Hoặc chạy `npm start` trong thư mục này. Lần chạy local đầu tiên, máy chủ tự tạo mật khẩu người dẫn và lưu trong file `.host-password`; file này bị Git bỏ qua nên không bị đẩy lên repository. Mật khẩu được hiển thị trong cửa sổ máy chủ để tạo phòng hoặc mở chế độ chơi thử.
 
-Nếu muốn dùng một mật khẩu cố định, đặt biến môi trường trước khi chạy, ví dụ trong PowerShell: `$env:HOST_PASSWORD = "mat-khau-cua-ban"`, sau đó chạy `npm start`.
+Nếu muốn tự chọn mật khẩu local cố định, tạo file `.env.local` với dòng `HOST_PASSWORD=mat-khau-rieng-cua-ban`, sau đó chạy `npm start`. Không commit `.env.local`, `.host-password` hoặc ghi mật khẩu thật vào README/source code.
 
 Chọn **Tạo phòng chơi** và nhập mật khẩu người dẫn trong cửa sổ máy chủ. Màn hình sảnh chờ hiển thị mã phòng và đường dẫn dùng cho các laptop cùng Wi-Fi. Cho học viên mở đường dẫn đó, đặt tên nhóm và tham gia. Nếu máy có nhiều card mạng, sảnh chờ hiển thị các đường dẫn thay thế; chọn địa chỉ thuộc Wi-Fi thực tế của lớp. Nếu laptop không kết nối được, kiểm tra cùng mạng và cho phép Node.js qua Windows Firewall trên mạng riêng.
 
@@ -23,6 +23,8 @@ Người dẫn có thể chỉnh câu hỏi, đáp án tương đương, giải 
 ## Giới hạn triển khai
 
 Phòng, tên nhóm, câu hỏi đã sửa và điểm chỉ lưu trong bộ nhớ của tiến trình Node.js. Đóng cửa sổ máy chủ hoặc khởi động lại sẽ mất các phòng đang chơi. Thiết bị phải truy cập được máy chủ qua cùng mạng; ứng dụng chưa có máy chủ công khai. Mỗi thiết bị lưu khóa tham gia trong trình duyệt để tải lại trang và tiếp tục. Người dẫn nên dùng cùng trình duyệt/tab đã tạo phòng.
+
+Không triển khai bản hiện tại trực tiếp lên Vercel để chơi thật: Vercel Functions có thể tạo nhiều instance và thu hồi instance, trong khi trạng thái trận đấu hiện chỉ nằm trong RAM. Muốn dùng Vercel cần chuyển `GameStore` sang kho dữ liệu dùng chung như Redis/Postgres và tạo Vercel Function handler. Trên Vercel, đặt `HOST_PASSWORD` trong **Project Settings → Environment Variables**, bật **Sensitive** cho Preview/Production, rồi redeploy; không đặt giá trị trong `vercel.json`.
 
 ## Kiểm tra
 

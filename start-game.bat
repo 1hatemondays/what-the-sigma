@@ -17,5 +17,5 @@ echo Mat khau nguoi dan se duoc hien ben duoi.
 echo Giu cua so nay mo trong suot tran dau.
 echo Nhan Ctrl+C de dung may chu.
 echo.
-node server.js
+node --env-file-if-exists=.env.local server.js
 pause

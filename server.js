@@ -1,13 +1,15 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
-import { randomInt, timingSafeEqual } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { GameStore, GameError } from './game.js';
 import { seedQuestions } from './seed.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const localPasswordFile = path.join(root, '.host-password');
 const staticFiles = { '/': ['index.html', 'text/html; charset=utf-8'], '/join': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'] };
 
 function json(res, status, data) {
@@ -42,6 +44,28 @@ function passwordMatches(value, expected) {
   return actual.length === wanted.length && timingSafeEqual(actual, wanted);
 }
 
+function hostPasswordForLocalRun() {
+  const configured = process.env.HOST_PASSWORD?.trim();
+  if (configured) return configured;
+  if (process.env.VERCEL) {
+    throw new Error('Thiếu biến môi trường HOST_PASSWORD trên Vercel.');
+  }
+  try {
+    const saved = readFileSync(localPasswordFile, 'utf8').trim();
+    if (saved) return saved;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const generated = randomBytes(18).toString('base64url');
+  try {
+    writeFileSync(localPasswordFile, `${generated}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+    return generated;
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    return readFileSync(localPasswordFile, 'utf8').trim();
+  }
+}
+
 function lanAddresses(port) {
   const addresses = [];
   for (const entries of Object.values(os.networkInterfaces())) for (const entry of entries || []) {
@@ -57,7 +81,8 @@ function lanAddresses(port) {
   return [...new Set(addresses)].sort((a, b) => preference(a) - preference(b));
 }
 
-export function createAppServer({ store = new GameStore({ questions: seedQuestions }), port = Number(process.env.PORT || 3000), hostPassword = process.env.HOST_PASSWORD || 'HCM202' } = {}) {
+export function createAppServer({ store = new GameStore({ questions: seedQuestions }), port = Number(process.env.PORT || 3000), hostPassword = process.env.HOST_PASSWORD } = {}) {
+  if (!hostPassword?.trim()) throw new Error('HOST_PASSWORD chưa được cấu hình.');
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -102,8 +127,18 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 3000);
-  const hostPassword = process.env.HOST_PASSWORD || String(randomInt(100000, 1000000));
-  createAppServer({ port, hostPassword }).listen(port, '0.0.0.0', () => {
+  const hostPassword = hostPasswordForLocalRun();
+  const server = createAppServer({ port, hostPassword });
+  server.on('error', error => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Không thể khởi động: cổng ${port} đang được một chương trình khác sử dụng.`);
+      console.error('Hãy dừng cửa sổ server cũ bằng Ctrl+C rồi chạy lại npm start.');
+      process.exitCode = 1;
+      return;
+    }
+    throw error;
+  });
+  server.listen(port, '0.0.0.0', () => {
     console.log(`Dấu ấn Hồ Chí Minh đang chạy tại http://localhost:${port}`);
     console.log(`Mật khẩu người dẫn: ${hostPassword}`);
     for (const address of lanAddresses(port)) console.log(`Thiết bị cùng Wi-Fi: ${address}`);
