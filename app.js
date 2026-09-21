@@ -253,7 +253,10 @@ document.addEventListener('click', async event => {
   event.preventDefault();
   const name = button.dataset.action;
   try {
-    if (name === 'home') { button.disabled = true; await goHome(); return; }
+    if (name === 'home') {
+      if (session && state?.role === 'player' && !window.confirm('Bạn có chắc chắn muốn rời phòng? Điểm số và kho chức năng của nhóm sẽ bị xóa.')) return;
+      button.disabled = true; await goHome(); return;
+    }
     if (name === 'join-screen') { history.pushState(null, '', '/join'); render(); return; }
     if (name === 'create') { openHostGate('create'); return; }
     if (name === 'demo') { openHostGate('demo'); return; }
