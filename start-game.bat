@@ -12,7 +12,8 @@ echo   DAU AN HO CHI MINH - WEBGAME LOP HOC
 echo ========================================
 echo.
 echo Mo http://localhost:3000 tren may nay.
-echo Dia chi Wi-Fi cho dien thoai hien ben duoi.
+echo Dia chi Wi-Fi cho laptop cac nhom hien ben duoi.
+echo Mat khau nguoi dan se duoc hien ben duoi.
 echo Giu cua so nay mo trong suot tran dau.
 echo Nhan Ctrl+C de dung may chu.
 echo.

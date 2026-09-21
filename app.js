@@ -42,7 +42,24 @@ function header(room = false) {
 }
 function page(content, room = false) { return `<div class="shell">${header(room)}${content}</div>`; }
 function landing() {
-  return page(`<main class="hero"><div><div class="eyebrow">Trò chơi tương tác dành cho lớp học</div><h1>Học lịch sử.<em>Chơi hết mình.</em></h1><p class="lead">Cùng đồng đội giải ô chữ, thử vận may với vòng quay và ghi điểm trước khi thời gian khép lại.</p><div class="hero-actions"><button class="btn large" data-action="create">Tạo phòng chơi <span aria-hidden="true">↗</span></button><button class="btn secondary large" data-action="join-screen">Vào phòng</button><button class="btn ghost large" data-action="demo">Chơi thử một mình</button></div><p class="hint-line">Mỗi nhóm dùng một điện thoại. Người dẫn điều khiển trận trên máy tính.</p></div><div class="hero-art" aria-hidden="true"><div class="hero-emblem"><span class="emblem-star">★</span><b>Tri thức là<br>sức mạnh</b><small>Khám phá · Ghi nhớ · Tranh tài</small></div><span class="art-note">Hành trình qua những dấu mốc và tư tưởng</span></div></main>`);
+  return page(`<main class="hero"><div><div class="eyebrow">Trò chơi tương tác dành cho lớp học</div><h1>Học lịch sử.<em>Chơi hết mình.</em></h1><p class="lead">Cùng đồng đội giải ô chữ, thử vận may với vòng quay và ghi điểm trước khi thời gian khép lại.</p><div class="hero-actions"><button class="btn large" data-action="create">Tạo phòng chơi <span aria-hidden="true">↗</span></button><button class="btn secondary large" data-action="join-screen">Vào phòng</button><button class="btn ghost large" data-action="demo">Chơi thử một mình</button></div><p class="hint-line">Mỗi nhóm dùng một laptop. Người dẫn điều khiển trận trên máy tính riêng.</p></div><div class="hero-art" aria-hidden="true"><div class="hero-emblem"><span class="emblem-star">★</span><b>Tri thức là<br>sức mạnh</b><small>Khám phá · Ghi nhớ · Tranh tài</small></div><span class="art-note">Hành trình qua những dấu mốc và tư tưởng</span></div></main>`);
+}
+function openHostGate(mode) {
+  const demo = mode === 'demo';
+  overlay.innerHTML = `<div class="spin-modal"><section class="spin-box host-gate" role="dialog" aria-modal="true" aria-labelledby="host-gate-title"><div class="eyebrow">Dành cho người dẫn</div><h2 id="host-gate-title">${demo ? 'Mở chế độ chơi thử' : 'Tạo phòng chơi'}</h2><p>Nhập mật khẩu được hiển thị trong cửa sổ máy chủ.</p><form id="host-gate-form" data-mode="${demo ? 'demo' : 'create'}"><div class="field"><label for="host-password">Mật khẩu người dẫn</label><input id="host-password" class="input" name="password" type="password" autocomplete="current-password" required autofocus></div><div class="host-actions"><button class="btn" type="submit">${demo ? 'Bắt đầu chơi thử' : 'Tạo phòng'}</button><button class="btn ghost" type="button" data-action="close-host-gate">Hủy</button></div></form></section></div>`;
+  document.getElementById('host-password')?.focus();
+}
+async function goHome() {
+  const current = session;
+  if (current && state?.role === 'player') {
+    try { await api(`/api/rooms/${current.code}/leave`, { method: 'POST' }); } catch { /* Rời giao diện ngay cả khi phòng đã đóng. */ }
+  }
+  saveSession(null);
+  state = null;
+  overlay.innerHTML = '';
+  editorOpen = false;
+  history.replaceState(null, '', '/');
+  render();
 }
 function joinPage() {
   const room = new URLSearchParams(location.search).get('room') || '';
@@ -71,12 +88,12 @@ function alternateLinks() {
 }
 function lobby() {
   const host = state.role === 'host';
-  const body = host ? `<div class="panel"><div class="panel-title">Mã phòng của bạn</div><div class="code-display">${esc(state.code)}</div><p>Cho các nhóm mở đường dẫn dưới đây trên thiết bị cùng mạng Wi-Fi, sau đó nhập mã phòng.</p><span class="share-url">${esc(shareLink())}</span>${alternateLinks()}<div class="host-actions"><button class="btn secondary" data-action="copy-link">Sao chép đường dẫn</button><button class="btn ghost" data-action="edit">Chỉnh câu hỏi & thời gian</button></div><div class="rule-strip"><div><b>${state.totalQuestions}</b><span>Câu hỏi</span></div><div><b>${state.durationSec}s</b><span>Mỗi câu</span></div><div><b>${state.players.length}</b><span>Nhóm đã vào</span></div></div><div class="host-actions"><button class="btn large" data-action="next" ${state.players.length ? '' : 'disabled'}>Bắt đầu vòng quay →</button></div></div>` : `<div class="panel"><div class="panel-title">Sẵn sàng tranh tài</div><h3>Chào ${esc(state.me.name)}!</h3><p class="lead">Trước trận, nhóm bạn sẽ quay 5 lần để tích trữ perk. Trước mỗi câu, nhóm có thể dùng một perk hoặc giữ lại cho câu sau.</p><div class="rule-strip"><div><b>${state.totalQuestions}</b><span>Câu hỏi</span></div><div><b>${state.durationSec}s</b><span>Mỗi câu</span></div><div><b>05</b><span>Lượt quay trước trận</span></div></div><p class="hint-line">Hãy giữ tab này mở. Nếu kết nối gián đoạn, mở lại trang trên cùng thiết bị để tiếp tục.</p></div>`;
+  const body = host ? `<div class="panel"><div class="panel-title">Mã phòng của bạn</div><div class="code-display">${esc(state.code)}</div><p>Cho các nhóm mở đường dẫn dưới đây trên laptop cùng mạng Wi-Fi, sau đó nhập mã phòng.</p><span class="share-url">${esc(shareLink())}</span>${alternateLinks()}<div class="host-actions"><button class="btn secondary" data-action="copy-link">Sao chép đường dẫn</button><button class="btn ghost" data-action="edit">Chỉnh câu hỏi & thời gian</button></div><div class="rule-strip"><div><b>${state.totalQuestions}</b><span>Câu hỏi</span></div><div><b>${state.durationSec}s</b><span>Mỗi câu</span></div><div><b>${state.players.length}</b><span>Nhóm đã vào</span></div></div><div class="host-actions"><button class="btn large" data-action="next" ${state.players.length ? '' : 'disabled'}>Bắt đầu vòng quay →</button></div></div>` : `<div class="panel"><div class="panel-title">Sẵn sàng tranh tài</div><h3>Chào ${esc(state.me.name)}!</h3><p class="lead">Trước trận, nhóm bạn sẽ quay 5 lần để tích trữ chức năng. Trước mỗi câu, nhóm có thể dùng một chức năng hoặc giữ lại cho câu sau.</p><div class="rule-strip"><div><b>${state.totalQuestions}</b><span>Câu hỏi</span></div><div><b>${state.durationSec}s</b><span>Mỗi câu</span></div><div><b>05</b><span>Lượt quay trước trận</span></div></div><p class="hint-line">Hãy giữ tab này mở. Nếu kết nối gián đoạn, mở lại trang trên cùng laptop để tiếp tục.</p></div>`;
   return page(`${intro(host ? 'Sảnh chờ' : 'Đang chờ bắt đầu', host ? 'Mời các nhóm vào phòng trước khi bắt đầu.' : `Phòng ${state.code} · Người dẫn đang chuẩn bị trận đấu.`, 'Giai đoạn chuẩn bị')}<div class="layout"><main>${body}</main>${sidebar()}</div>`, true);
 }
 function wheelGraphic(spinning = false, item = 'shield') { const offset = { shield: 0, hint: 270, bonus: 180, fog: 90 }[item] || 0; return `<div class="wheel-wrap" aria-hidden="true"><span class="wheel-pointer"></span><div class="wheel ${spinning ? 'spinning' : ''}" style="--final-angle:${1440 + offset}deg"><span class="wheel-label one">KHIÊN</span><span class="wheel-label two">GỢI Ý</span><span class="wheel-label three">CỘNG ĐIỂM</span><span class="wheel-label four">MÀN SƯƠNG</span></div></div>`; }
 function itemCard(item, used = false) {
-  if (!item) return `<div class="item-card empty"><div><b>Không dùng perk</b></div><p>Nhóm giữ lại toàn bộ perk cho câu sau.</p></div>`;
+  if (!item) return `<div class="item-card empty"><div><b>Không dùng chức năng</b></div><p>Nhóm giữ lại toàn bộ chức năng cho câu sau.</p></div>`;
   const entry = state.itemCatalog[item];
   return `<div class="item-card"><span class="icon" aria-hidden="true">${esc(entry.icon)}</span><div><b>${esc(entry.name)}</b>${used ? ' · Đã kích hoạt' : ''}</div><p>${esc(entry.description)}</p></div>`;
 }
@@ -85,28 +102,28 @@ function inventoryCounts(items = []) {
 }
 function inventoryHtml(items = []) {
   const entries = inventoryCounts(items);
-  return entries.length ? `<div class="perk-inventory">${entries.map(({ item, count }) => { const entry = state.itemCatalog[item]; return `<div class="perk-chip"><span aria-hidden="true">${esc(entry.icon)}</span><strong>${esc(entry.name)}</strong><b>×${count}</b></div>`; }).join('')}</div>` : '<p class="muted">Kho perk đã hết.</p>';
+  return entries.length ? `<div class="perk-inventory">${entries.map(({ item, count }) => { const entry = state.itemCatalog[item]; return `<div class="perk-chip"><span aria-hidden="true">${esc(entry.icon)}</span><strong>${esc(entry.name)}</strong><b>×${count}</b></div>`; }).join('')}</div>` : '<p class="muted">Kho chức năng đã hết.</p>';
 }
 function wheelPage() {
   const host = state.role === 'host';
   const pending = state.players.filter(p => !p.spun).length;
   const spinsLeft = 5 - (state.me?.spins || 0);
-  const main = host ? `<div class="panel"><div class="panel-title">Vòng quay trước trận · 5 lượt mỗi nhóm</div><div class="wheel-area">${wheelGraphic()}<div><h3>Tích trữ perk cho cả trận</h3><p>Mỗi nhóm quay đủ 5 lượt. Perk nhận được sẽ được giữ trong kho để lựa chọn trước từng câu hỏi.</p><p class="muted">${pending ? `Còn ${pending} nhóm chưa hoàn thành 5 lượt.` : 'Tất cả đã quay đủ. Sẵn sàng bước vào phần chọn perk.'}</p><div class="host-actions">${pending ? '<button class="btn ghost" data-action="spin-missing">Quay đủ hộ các nhóm</button>' : ''}<button class="btn" data-action="begin" ${pending ? 'disabled' : ''}>Tiếp tục chọn perk →</button></div></div></div></div>` : `<div class="panel"><div class="panel-title">Lượt ${Math.min(state.me.spins + 1, 5)} / 5 · Vòng quay trước trận</div><div class="wheel-area">${wheelGraphic()}<div><h3>${spinsLeft ? `Còn ${spinsLeft} lượt quay` : 'Kho perk đã sẵn sàng!'}</h3><p>Mỗi perk chỉ dùng được một lần. Bạn có thể giữ lại và chọn thời điểm phù hợp trong trận.</p>${inventoryHtml(state.me.inventory)}${spinsLeft ? '<button class="btn large" data-action="spin">Quay vòng quay ✦</button>' : session.demo ? '<button class="btn" data-action="begin">Tiếp tục chọn perk →</button>' : '<p class="hint-line">Chờ người dẫn đưa các nhóm vào phần chọn perk.</p>'}</div></div></div>`;
-  return page(`${intro('Vòng quay may mắn', 'Quay 5 lần trước trận để xây dựng kho perk của nhóm.', 'Giai đoạn trước trận')}<div class="layout"><main>${main}</main>${sidebar('spin')}</div>`, true);
+  const main = host ? `<div class="panel"><div class="panel-title">Vòng quay trước trận · 5 lượt mỗi nhóm</div><div class="wheel-area">${wheelGraphic()}<div><h3>Tích trữ chức năng cho cả trận</h3><p>Mỗi nhóm quay đủ 5 lượt. Chức năng nhận được sẽ được giữ trong kho để lựa chọn trước từng câu hỏi.</p><p class="muted">${pending ? `Còn ${pending} nhóm chưa hoàn thành 5 lượt.` : 'Tất cả đã quay đủ. Sẵn sàng bước vào phần chọn chức năng.'}</p><div class="host-actions">${pending ? '<button class="btn ghost" data-action="spin-missing">Quay đủ hộ các nhóm</button>' : ''}<button class="btn" data-action="begin" ${pending ? 'disabled' : ''}>Tiếp tục chọn chức năng →</button></div></div></div></div>` : `<div class="panel"><div class="panel-title">Lượt ${Math.min(state.me.spins + 1, 5)} / 5 · Vòng quay trước trận</div><div class="wheel-area">${wheelGraphic()}<div><h3>${spinsLeft ? `Còn ${spinsLeft} lượt quay` : 'Kho chức năng đã sẵn sàng!'}</h3><p>Mỗi chức năng chỉ dùng được một lần. Bạn có thể giữ lại và chọn thời điểm phù hợp trong trận.</p>${inventoryHtml(state.me.inventory)}${spinsLeft ? '<button class="btn large" data-action="spin">Quay vòng quay ✦</button>' : session.demo ? '<button class="btn" data-action="begin">Tiếp tục chọn chức năng →</button>' : '<p class="hint-line">Chờ người dẫn đưa các nhóm vào phần chọn chức năng.</p>'}</div></div></div>`;
+  return page(`${intro('Vòng quay may mắn', 'Quay 5 lần trước trận để xây dựng kho chức năng của nhóm.', 'Giai đoạn trước trận')}<div class="layout"><main>${main}</main>${sidebar('spin')}</div>`, true);
 }
 function preparePage() {
   const host = state.role === 'host';
   const pending = state.players.filter(p => !p.prepared).length;
   if (host) {
-    const main = `<div class="panel"><div class="panel-title">Câu ${state.questionIndex + 1} / ${state.totalQuestions} · Chọn perk</div><h3>Các nhóm đang chuẩn bị</h3><p>Trước khi mở câu hỏi, mỗi nhóm chọn dùng một perk trong kho hoặc bỏ qua để giữ lại.</p><p class="muted">${pending ? `Còn ${pending} nhóm chưa chốt lựa chọn.` : 'Tất cả nhóm đã sẵn sàng.'}</p><div class="host-actions">${pending ? '<button class="btn ghost" data-action="prepare-missing">Bỏ qua hộ nhóm chưa chọn</button>' : ''}<button class="btn large" data-action="begin" ${pending ? 'disabled' : ''}>Mở câu hỏi →</button></div></div>`;
-    return page(`${intro('Chuẩn bị câu hỏi', 'Mỗi nhóm được dùng tối đa một perk cho câu này.', `Câu ${state.questionIndex + 1} / ${state.totalQuestions}`)}<div class="layout"><main>${main}</main>${sidebar('prepare')}</div>`, true);
+    const main = `<div class="panel"><div class="panel-title">Câu ${state.questionIndex + 1} / ${state.totalQuestions} · Chọn chức năng</div><h3>Các nhóm đang chuẩn bị</h3><p>Trước khi mở câu hỏi, mỗi nhóm chọn dùng một chức năng trong kho hoặc bỏ qua để giữ lại.</p><p class="muted">${pending ? `Còn ${pending} nhóm chưa chốt lựa chọn.` : 'Tất cả nhóm đã sẵn sàng.'}</p><div class="host-actions">${pending ? '<button class="btn ghost" data-action="prepare-missing">Bỏ qua hộ nhóm chưa chọn</button>' : ''}<button class="btn large" data-action="begin" ${pending ? 'disabled' : ''}>Mở câu hỏi →</button></div></div>`;
+    return page(`${intro('Chuẩn bị câu hỏi', 'Mỗi nhóm được dùng tối đa một chức năng cho câu này.', `Câu ${state.questionIndex + 1} / ${state.totalQuestions}`)}<div class="layout"><main>${main}</main>${sidebar('prepare')}</div>`, true);
   }
   const targets = state.players.filter(p => p.id !== state.me.id);
   const options = inventoryCounts(state.me.inventory).map(({ item, count }) => { const entry = state.itemCatalog[item]; const unavailable = item === 'fog' && !targets.length; return `<label class="perk-option ${unavailable ? 'disabled' : ''}"><input type="radio" name="item" value="${esc(item)}" ${unavailable ? 'disabled' : ''}><span class="perk-option-icon" aria-hidden="true">${esc(entry.icon)}</span><span><strong>${esc(entry.name)}</strong><small>${esc(entry.description)}${unavailable ? ' Cần ít nhất một nhóm đối thủ.' : ''}</small></span><b>×${count}</b></label>`; }).join('');
-  const form = options ? `<form id="perk-form"><div class="perk-options">${options}</div><div class="fog-target"><label for="target-select">Nếu dùng Màn sương, chọn đối thủ</label><select id="target-select" class="input" name="targetId"><option value="">Chọn một nhóm</option>${targets.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></div><div class="host-actions"><button class="btn" type="submit">Dùng perk đã chọn</button><button class="btn ghost" type="button" data-action="skip-perk">Không dùng perk</button></div></form>` : `<button class="btn ghost" data-action="skip-perk">Tiếp tục không dùng perk</button>`;
+  const form = options ? `<form id="perk-form"><div class="perk-options">${options}</div><div class="fog-target"><label for="target-select">Nếu dùng Màn sương, chọn đối thủ</label><select id="target-select" class="input" name="targetId"><option value="">Chọn một nhóm</option>${targets.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></div><div class="host-actions"><button class="btn" type="submit">Dùng chức năng đã chọn</button><button class="btn ghost" type="button" data-action="skip-perk">Không dùng chức năng</button></div></form>` : `<button class="btn ghost" data-action="skip-perk">Tiếp tục không dùng chức năng</button>`;
   const chosen = state.me.selectedItem ? itemCard(state.me.selectedItem, true) : itemCard(null);
-  const main = `<div class="panel"><div class="panel-title">Câu ${state.questionIndex + 1} / ${state.totalQuestions} · Kho perk</div><h3>${state.me.prepared ? 'Đã chốt lựa chọn' : 'Bạn có muốn dùng perk?'}</h3><p>${state.me.prepared ? 'Lựa chọn đã được ghi nhận. Hãy chờ người dẫn mở câu hỏi.' : 'Chọn tối đa một perk cho câu sắp tới, hoặc bỏ qua để giữ lại.'}</p>${state.me.prepared ? chosen : `${inventoryHtml(state.me.inventory)}${form}`}${state.me.prepared && session.demo ? '<div class="host-actions"><button class="btn" data-action="begin">Mở câu hỏi →</button></div>' : ''}</div>`;
-  return page(`${intro('Chuẩn bị câu hỏi', 'Quyết định trước khi câu hỏi được mở.', `Câu ${state.questionIndex + 1} / ${state.totalQuestions}`)}<div class="layout"><main>${main}</main><aside><div class="panel"><div class="panel-title">Kho còn lại</div>${inventoryHtml(state.me.inventory)}</div><div class="panel"><div class="panel-title">Lựa chọn của các nhóm</div>${playerList('prepare')}</div></aside></div>`, true);
+  const main = `<div class="panel"><div class="panel-title">Câu ${state.questionIndex + 1} / ${state.totalQuestions} · Kho chức năng</div><h3>${state.me.prepared ? 'Đã chốt lựa chọn' : 'Bạn có muốn dùng chức năng?'}</h3><p>${state.me.prepared ? 'Lựa chọn đã được ghi nhận. Hãy chờ người dẫn mở câu hỏi.' : 'Chọn tối đa một chức năng cho câu sắp tới, hoặc bỏ qua để giữ lại.'}</p>${state.me.prepared ? chosen : `${inventoryHtml(state.me.inventory)}${form}`}${state.me.prepared && session.demo ? '<div class="host-actions"><button class="btn" data-action="begin">Mở câu hỏi →</button></div>' : ''}</div>`;
+  return page(`${intro('Chuẩn bị câu hỏi', 'Quyết định trước khi câu hỏi được mở.', `Câu ${state.questionIndex + 1} / ${state.totalQuestions}`)}<div class="layout"><main>${main}</main><aside><div class="panel"><div class="panel-title">Kho chức năng còn lại</div>${inventoryHtml(state.me.inventory)}</div><div class="panel"><div class="panel-title">Lựa chọn của các nhóm</div>${playerList('prepare')}</div></aside></div>`, true);
 }
 function slotHtml(slot) {
   if (slot.separator && slot.text === ' ') return '<span class="slot sep" aria-label="khoảng trắng"></span>';
@@ -135,7 +152,7 @@ function questionPage() {
   const wrongWait = state.me && state.me.wrongUntil > nowServer();
   const form = host ? '<p class="hint-line">Câu hỏi sẽ tự kết thúc khi hết giờ hoặc tất cả nhóm trả lời đúng.</p>' : state.me.solved ? `<div class="feedback correct">Nhóm bạn đã trả lời đúng và nhận ${state.me.roundPoints} điểm. Chờ các nhóm khác.</div>` : `<form id="answer-form" class="answer-form"><input class="input" id="answer-input" name="answer" maxlength="100" autocomplete="off" autocapitalize="sentences" placeholder="Nhập đáp án của nhóm..." aria-label="Nhập đáp án" required><button class="btn" type="submit" ${wrongWait ? 'disabled' : ''}>Trả lời →</button></form>${feedback}`;
   const main = `<div class="panel"><div class="timer-row"><div><div class="kicker">Câu ${state.questionIndex + 1} / ${state.totalQuestions}</div><div class="muted">Mỗi giây hé một ký tự</div></div><div class="timer ${timeLeft <= 5 ? 'urgent' : ''}">${String(timeLeft).padStart(2, '0')}<small> giây</small></div></div><div class="timer-track"><div class="timer-fill" style="width:${percent}%"></div></div><h3 class="question-heading">${esc(q.prompt)}</h3><div class="slots ${fog ? 'fogged' : ''}" aria-label="Ô chữ đáp án">${slotsHtml(q.slots)}</div>${fog ? '<p class="hint-line">Màn sương đang che ô chữ. Bạn vẫn có thể nhập đáp án.</p>' : ''}${form}</div>`;
-  return page(`${intro('Giải ô chữ', 'Trả lời càng sớm, điểm càng cao.', 'Thử thách đang diễn ra')}<div class="layout"><main>${main}</main><aside><div class="panel"><div class="panel-title">${host ? 'Bảng xếp hạng' : 'Perk của câu này'}</div>${host ? playerList() : itemCard(item, Boolean(item))}</div>${host ? '' : `<div class="panel"><div class="panel-title">Bảng xếp hạng</div>${playerList()}</div>`}</aside></div>`, true);
+  return page(`${intro('Giải ô chữ', 'Trả lời càng sớm, điểm càng cao.', 'Thử thách đang diễn ra')}<div class="layout"><main>${main}</main><aside><div class="panel"><div class="panel-title">${host ? 'Bảng xếp hạng' : 'Chức năng của câu này'}</div>${host ? playerList() : itemCard(item, Boolean(item))}</div>${host ? '' : `<div class="panel"><div class="panel-title">Bảng xếp hạng</div>${playerList()}</div>`}</aside></div>`, true);
 }
 function sourceHtml(q) { const href = safeHref(q.source); return href ? `<p class="source">Nguồn tham khảo: <a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(q.source)}</a></p>` : ''; }
 function revealPage() {
@@ -236,21 +253,11 @@ document.addEventListener('click', async event => {
   event.preventDefault();
   const name = button.dataset.action;
   try {
-    if (name === 'home') { saveSession(null); state = null; history.replaceState(null, '', '/'); closeEditor(); return; }
+    if (name === 'home') { button.disabled = true; await goHome(); return; }
     if (name === 'join-screen') { history.pushState(null, '', '/join'); render(); return; }
-    if (name === 'create') {
-      button.disabled = true;
-      const made = await api('/api/rooms', { method: 'POST', data: {} });
-      saveSession({ code: made.code, token: made.token, demo: false });
-      history.replaceState(null, '', '/'); await refresh(true); return;
-    }
-    if (name === 'demo') {
-      button.disabled = true;
-      const made = await api('/api/rooms', { method: 'POST', data: {} });
-      const joined = await api(`/api/rooms/${made.code}/join`, { method: 'POST', data: { name: 'Nhóm chơi thử' }, token: '' });
-      saveSession({ code: made.code, token: joined.token, demo: true, demoHostToken: made.token });
-      await action('next', {}, made.token); return;
-    }
+    if (name === 'create') { openHostGate('create'); return; }
+    if (name === 'demo') { openHostGate('demo'); return; }
+    if (name === 'close-host-gate') { overlay.innerHTML = ''; return; }
     if (name === 'copy-link') { await navigator.clipboard.writeText(shareLink()); notify('Đã sao chép đường dẫn vào phòng.'); return; }
     if (name === 'edit') { openEditor(); return; }
     if (name === 'close-editor') { closeEditor(); return; }
@@ -264,8 +271,8 @@ document.addEventListener('click', async event => {
       return;
     }
     if (name === 'spin-missing') { await action('spin-missing'); notify('Đã hoàn tất 5 lượt quay cho các nhóm còn thiếu.'); return; }
-    if (name === 'prepare-missing') { await action('prepare-missing'); notify('Các nhóm chưa chọn sẽ bỏ qua perk ở câu này.'); return; }
-    if (name === 'skip-perk') { await action('prepare', { item: null }); notify('Đã giữ lại perk cho câu sau.'); return; }
+    if (name === 'prepare-missing') { await action('prepare-missing'); notify('Các nhóm chưa chọn sẽ bỏ qua chức năng ở câu này.'); return; }
+    if (name === 'skip-perk') { await action('prepare', { item: null }); notify('Đã giữ lại chức năng cho câu sau.'); return; }
     if (name === 'begin') { await action('begin', {}, session.demo ? session.demoHostToken : undefined); return; }
   } catch (error) { button.disabled = false; notify(error.message); }
 });
@@ -276,17 +283,29 @@ document.addEventListener('submit', async event => {
   const submit = form.querySelector('[type=submit]');
   if (submit) submit.disabled = true;
   try {
-    if (form.id === 'join-form') {
+    if (form.id === 'host-gate-form') {
+      const password = form.elements.namedItem('password').value;
+      const made = await api('/api/rooms', { method: 'POST', data: { password } });
+      overlay.innerHTML = '';
+      if (form.dataset.mode === 'demo') {
+        const joined = await api(`/api/rooms/${made.code}/join`, { method: 'POST', data: { name: 'Nhóm chơi thử' }, token: '' });
+        saveSession({ code: made.code, token: joined.token, demo: true, demoHostToken: made.token });
+        await action('next', {}, made.token);
+      } else {
+        saveSession({ code: made.code, token: made.token, demo: false });
+        history.replaceState(null, '', '/'); await refresh(true);
+      }
+    } else if (form.id === 'join-form') {
       const code = form.elements.namedItem('code').value.trim();
       const result = await api(`/api/rooms/${code}/join`, { method: 'POST', data: { name: form.elements.namedItem('name').value } });
       saveSession({ code, token: result.token, demo: false });
       history.replaceState(null, '', '/'); await refresh(true);
     } else if (form.id === 'perk-form') {
       const item = form.elements.namedItem('item')?.value;
-      if (!item) throw new Error('Hãy chọn một perk hoặc bấm “Không dùng perk”.');
+      if (!item) throw new Error('Hãy chọn một chức năng hoặc bấm “Không dùng chức năng”.');
       const targetId = form.elements.namedItem('targetId')?.value || null;
       await action('prepare', { item, targetId });
-      notify('Đã chốt perk cho câu này.');
+      notify('Đã chốt chức năng cho câu này.');
     } else if (form.id === 'answer-form') {
       const answer = form.elements.namedItem('answer').value;
       const result = await action('answer', { answer });

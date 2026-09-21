@@ -76,7 +76,7 @@ test('host permissions, question validation, and wheel lifecycle', () => {
   f.store.spinMissing(f.host);
   f.store.begin(f.host);
   assert.equal(f.store.state(f.first).phase, 'prepare');
-  assert.throws(() => f.store.begin(f.host), /chọn perk hoặc bỏ qua/);
+  assert.throws(() => f.store.begin(f.host), /chọn chức năng hoặc bỏ qua/);
   f.store.prepare(f.first);
   assert.throws(() => f.store.prepare(f.first), /đã chốt/);
   f.store.prepareMissing(f.host);
@@ -151,4 +151,11 @@ test('ties share rank and stable join order', () => {
   const f = fixture();
   const list = f.store.state(f.host).players;
   assert.deepEqual(list.map(p => [p.name, p.rank]), [['Sao Vàng', 1], ['Đoàn Kết', 1]]);
+});
+
+test('leaving removes a player from the room immediately', () => {
+  const f = fixture();
+  f.store.leave(f.first);
+  assert.deepEqual(f.store.state(f.host).players.map(p => p.name), ['Đoàn Kết']);
+  assert.throws(() => f.store.auth(f.host.room.code, f.first.player.token), /không hợp lệ/);
 });

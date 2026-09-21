@@ -83,6 +83,16 @@ export class GameStore {
     return { code: room.code, token: player.token };
   }
 
+  leave(auth) {
+    this.requirePlayer(auth);
+    const r = auth.room;
+    const index = r.players.indexOf(auth.player);
+    if (index < 0) throw new GameError('Nhóm không còn ở trong phòng.', 404);
+    r.players.splice(index, 1);
+    if (r.phase === 'question' && r.players.length > 0 && r.players.every(p => p.solvedAt !== null)) this.reveal(r);
+    else r.version++;
+  }
+
   requireHost(auth) { if (auth.role !== 'host') throw new GameError('Chỉ người dẫn mới thực hiện được thao tác này.', 403); }
   requirePlayer(auth) { if (auth.role !== 'player') throw new GameError('Thao tác này chỉ dành cho nhóm chơi.', 403); }
 
@@ -144,12 +154,12 @@ export class GameStore {
   prepare(auth, { item = null, targetId = null } = {}) {
     this.requirePlayer(auth);
     const { room: r, player: p } = auth;
-    if (r.phase !== 'prepare') throw new GameError('Chưa đến lúc chọn perk.');
+    if (r.phase !== 'prepare') throw new GameError('Chưa đến lúc chọn chức năng.');
     if (p.prepared) throw new GameError('Nhóm đã chốt lựa chọn cho câu này.');
     if (item !== null) {
-      if (!ITEM[item]) throw new GameError('Perk không hợp lệ.');
+      if (!ITEM[item]) throw new GameError('Chức năng không hợp lệ.');
       const inventoryIndex = p.inventory.indexOf(item);
-      if (inventoryIndex < 0) throw new GameError('Perk này không còn trong kho.');
+      if (inventoryIndex < 0) throw new GameError('Chức năng này không còn trong kho.');
       if (item === 'fog') {
         const target = r.players.find(x => x.id === targetId);
         if (!target || target === p) throw new GameError('Hãy chọn một nhóm đối thủ.');
@@ -159,7 +169,7 @@ export class GameStore {
       p.selectedTargetId = item === 'fog' ? targetId : null;
     }
     p.prepared = true;
-    p.feedback = { kind: 'info', text: item ? `Đã chọn ${ITEM[item].name} cho câu này.` : 'Nhóm sẽ không dùng perk ở câu này.' };
+    p.feedback = { kind: 'info', text: item ? `Đã chọn chức năng ${ITEM[item].name} cho câu này.` : 'Nhóm sẽ không dùng chức năng ở câu này.' };
     r.version++;
     return { selectedItem: p.selectedItem };
   }
@@ -170,7 +180,7 @@ export class GameStore {
     if (r.phase !== 'prepare') throw new GameError('Chỉ có thể bỏ qua hộ trong giai đoạn chuẩn bị.');
     for (const p of r.players) if (!p.prepared) {
       p.prepared = true;
-      p.feedback = { kind: 'info', text: 'Người dẫn đã chọn bỏ qua perk cho câu này.' };
+      p.feedback = { kind: 'info', text: 'Người dẫn đã chọn bỏ qua chức năng cho câu này.' };
     }
     r.version++;
   }
@@ -184,7 +194,7 @@ export class GameStore {
       return;
     }
     if (r.phase !== 'prepare') throw new GameError('Chưa đến lúc bắt đầu câu.');
-    if (r.players.some(p => !p.prepared)) throw new GameError('Hãy đợi tất cả nhóm chọn perk hoặc bỏ qua.');
+    if (r.players.some(p => !p.prepared)) throw new GameError('Hãy đợi tất cả nhóm chọn chức năng hoặc bỏ qua.');
     r.phase = 'question'; r.startedAt = this.now();
     this.activatePerks(r);
     r.version++;

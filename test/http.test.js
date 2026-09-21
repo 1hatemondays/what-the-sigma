@@ -8,7 +8,7 @@ import { GameStore } from '../game.js';
 test('HTTP flow: create, join two groups, protect state, answer, reconnect', async () => {
   let time = 100_000;
   const store = new GameStore({ questions: [{ prompt: 'Tên khai sinh?', answer: 'Nguyễn Sinh Cung', aliases: [], explanation: 'Tên khai sinh.', source: '' }], now: () => time, chooseItem: () => 'bonus' });
-  const server = createAppServer({ store, port: 0 }).listen(0, '127.0.0.1');
+  const server = createAppServer({ store, port: 0, hostPassword: 'test-secret' }).listen(0, '127.0.0.1');
   await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;
   const request = async (path, method = 'GET', token, data) => {
@@ -16,10 +16,14 @@ test('HTTP flow: create, join two groups, protect state, answer, reconnect', asy
     return { status: res.status, data: await res.json() };
   };
   try {
-    const created = (await request('/api/rooms', 'POST', null, { durationSec: 10 })).data;
+    assert.equal((await request('/api/rooms', 'POST', null, { password: 'wrong' })).status, 403);
+    const created = (await request('/api/rooms', 'POST', null, { password: 'test-secret', durationSec: 10 })).data;
     const prefix = `/api/rooms/${created.code}`;
     const a = (await request(prefix + '/join', 'POST', null, { name: 'Sao Vàng' })).data;
     const b = (await request(prefix + '/join', 'POST', null, { name: 'Đoàn Kết' })).data;
+    const leaving = (await request(prefix + '/join', 'POST', null, { name: 'Rời Phòng' })).data;
+    assert.equal((await request(prefix + '/leave', 'POST', leaving.token, {})).status, 200);
+    assert.deepEqual((await request(prefix + '/state', 'GET', created.token)).data.players.map(p => p.name), ['Sao Vàng', 'Đoàn Kết']);
     assert.equal((await request(prefix + '/state')).status, 401);
     assert.equal((await request(prefix + '/next', 'POST', a.token, {})).status, 403);
     assert.equal((await request(prefix + '/config', 'POST', created.token, { questions: [null] })).status, 400);
@@ -55,11 +59,11 @@ test('HTTP flow: create, join two groups, protect state, answer, reconnect', asy
 });
 
 test('HTTP JSON body handles split UTF-8 bytes and rejects null', async () => {
-  const server = createAppServer({ port: 0 }).listen(0, '127.0.0.1');
+  const server = createAppServer({ port: 0, hostPassword: 'test-secret' }).listen(0, '127.0.0.1');
   await once(server, 'listening');
   const port = server.address().port;
   try {
-    const created = await fetch(`http://127.0.0.1:${port}/api/rooms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json());
+    const created = await fetch(`http://127.0.0.1:${port}/api/rooms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'test-secret' }) }).then(r => r.json());
     const payload = Buffer.from(JSON.stringify({ name: 'Đội Việt Nam' }));
     const accent = payload.indexOf(0xc4);
     const result = await new Promise((resolve, reject) => {

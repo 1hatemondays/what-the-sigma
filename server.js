@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
+import { randomInt, timingSafeEqual } from 'node:crypto';
 import { GameStore, GameError } from './game.js';
 import { seedQuestions } from './seed.js';
 
@@ -35,6 +36,12 @@ function authToken(req) {
   return value.startsWith('Bearer ') ? value.slice(7) : '';
 }
 
+function passwordMatches(value, expected) {
+  const actual = Buffer.from(String(value ?? ''), 'utf8');
+  const wanted = Buffer.from(String(expected), 'utf8');
+  return actual.length === wanted.length && timingSafeEqual(actual, wanted);
+}
+
 function lanAddresses(port) {
   const addresses = [];
   for (const entries of Object.values(os.networkInterfaces())) for (const entry of entries || []) {
@@ -50,7 +57,7 @@ function lanAddresses(port) {
   return [...new Set(addresses)].sort((a, b) => preference(a) - preference(b));
 }
 
-export function createAppServer({ store = new GameStore({ questions: seedQuestions }), port = Number(process.env.PORT || 3000) } = {}) {
+export function createAppServer({ store = new GameStore({ questions: seedQuestions }), port = Number(process.env.PORT || 3000), hostPassword = process.env.HOST_PASSWORD || 'HCM202' } = {}) {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -61,8 +68,12 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
         res.end(content); return;
       }
       if (req.method === 'GET' && url.pathname === '/api/info') return json(res, 200, { lanUrls: lanAddresses(server.address()?.port || port) });
-      if (req.method === 'POST' && url.pathname === '/api/rooms') return json(res, 201, store.create(await body(req)));
-      const match = url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|state|config|next|spin|spin-missing|prepare|prepare-missing|begin|answer))?$/);
+      if (req.method === 'POST' && url.pathname === '/api/rooms') {
+        const { password, ...options } = await body(req);
+        if (!passwordMatches(password, hostPassword)) throw new GameError('Mật khẩu người dẫn không đúng.', 403);
+        return json(res, 201, store.create(options));
+      }
+      const match = url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|state|leave|config|next|spin|spin-missing|prepare|prepare-missing|begin|answer))?$/);
       if (!match) return json(res, 404, { error: 'Không tìm thấy trang.' });
       const [, code, action] = match;
       if (req.method === 'POST' && action === 'join') return json(res, 201, store.join(code, (await body(req)).name));
@@ -70,7 +81,8 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
       if (req.method === 'GET' && action === 'state') return json(res, 200, store.state(auth));
       if (req.method !== 'POST') return json(res, 405, { error: 'Phương thức không hợp lệ.' });
       let result = {};
-      if (action === 'config') store.configure(auth, await body(req));
+      if (action === 'leave') store.leave(auth);
+      else if (action === 'config') store.configure(auth, await body(req));
       else if (action === 'next') store.next(auth);
       else if (action === 'spin') result = store.spin(auth);
       else if (action === 'spin-missing') store.spinMissing(auth);
@@ -90,8 +102,10 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 3000);
-  createAppServer({ port }).listen(port, '0.0.0.0', () => {
+  const hostPassword = process.env.HOST_PASSWORD || String(randomInt(100000, 1000000));
+  createAppServer({ port, hostPassword }).listen(port, '0.0.0.0', () => {
     console.log(`Dấu ấn Hồ Chí Minh đang chạy tại http://localhost:${port}`);
+    console.log(`Mật khẩu người dẫn: ${hostPassword}`);
     for (const address of lanAddresses(port)) console.log(`Thiết bị cùng Wi-Fi: ${address}`);
   });
 }
