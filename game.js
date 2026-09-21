@@ -278,7 +278,9 @@ export class GameStore {
       let count = 0;
       const slots = chars.map((ch, i) => {
         if (!/\p{L}|\p{N}/u.test(ch)) return { text: ch, open: true, separator: true };
-        const open = count++ < revealed || (player && player.hintIndexes.includes(i)) || ['reveal', 'final'].includes(r.phase);
+        const hinted = Boolean(player && player.hintIndexes.includes(i));
+        const open = hinted || count < revealed || ['reveal', 'final'].includes(r.phase);
+        if (!hinted) count += 1;
         return { text: open ? ch : '', open, separator: false };
       });
       state.question = { prompt: q.prompt, slots, ...(q.images?.length ? { images: [...q.images], imageAlt: q.imageAlt } : {}) };

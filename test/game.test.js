@@ -144,6 +144,11 @@ test('hint reveals only to owner and bonus adds 200 after correct answer', () =>
   const other = f.store.state(f.second).question.slots.filter(s => s.open && !s.separator).length;
   assert.equal(own - other, 2);
   f.tick(1_000);
+  const ownAfterOneSecond = f.store.state(f.first).question.slots.filter(s => s.open && !s.separator).length;
+  const otherAfterOneSecond = f.store.state(f.second).question.slots.filter(s => s.open && !s.separator).length;
+  assert.equal(ownAfterOneSecond, 3);
+  assert.equal(otherAfterOneSecond, 1);
+  assert.equal(ownAfterOneSecond - otherAfterOneSecond, 2);
   f.store.submit(f.second, 'Đường Kách mệnh');
   assert.equal(f.store.state(f.second).me.roundPoints, scoreFor(1_000, 10) + 200);
 });
