@@ -16,7 +16,7 @@ Người dẫn có thể chỉnh câu hỏi, đáp án tương đương, giải 
 
 - Mỗi câu mặc định 30 giây, có thể chỉnh 10–90 giây. Trả lời đúng nhận từ 100 đến 1000 điểm theo thời gian; sai có thời gian chờ 2 giây.
 - Mỗi nhóm quay đúng 5 lần trước trận. Chức năng có thể trùng và được giữ trong kho; trước mỗi câu, nhóm dùng tối đa một chức năng hoặc bỏ qua. Chức năng đã dùng bị trừ khỏi kho.
-- Khiên chặn một Màn sương; Gợi ý hé thêm hai chữ; Cộng điểm thưởng 200 nếu trả lời đúng; Màn sương che ô chữ đối thủ ba giây nhưng vẫn cho phép nhập đáp án. Các hiệu ứng kích hoạt khi người dẫn mở câu.
+- Khiên chặn một đòn tấn công; Gợi ý hé thêm hai chữ; Cộng điểm thưởng 200 nếu trả lời đúng; Màn sương che ô chữ đối thủ ba giây; Đóng băng khóa trả lời đối thủ trong ba giây đầu; Bẫy điểm trừ 100 điểm khi đối thủ trả lời sai lần đầu. Mỗi nhóm chỉ chịu tối đa một đòn trong một câu. Các hiệu ứng kích hoạt khi người dẫn mở câu.
 - Đáp án không phân biệt hoa/thường, dấu tiếng Việt và khoảng trắng dư. Người dẫn có thể thêm các cách viết tương đương.
 - Nhóm bằng điểm cùng thứ hạng. Máy chủ quyết định lượt quay, thời gian, đáp án và điểm.
 

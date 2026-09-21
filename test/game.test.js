@@ -137,6 +137,64 @@ test('items are private, single-use, and shield blocks targeted fog', () => {
   assert.throws(() => f.store.prepare(f.second, { item: 'bonus' }), /Chưa đến lúc/);
 });
 
+test('freeze blocks answers for only the first three seconds', () => {
+  const f = fixture(['freeze', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus']);
+  reachPreparation(f);
+  f.store.prepare(f.first, { item: 'freeze', targetId: f.second.player.id });
+  f.store.prepare(f.second);
+  f.store.begin(f.host);
+  assert.equal(f.store.state(f.second).me.freezeUntil, 1_003_000);
+  assert.throws(() => f.store.submit(f.second, 'Đường Kách mệnh'), /Đóng băng/);
+  f.tick(2_999);
+  assert.throws(() => f.store.submit(f.second, 'Đường Kách mệnh'), /Đóng băng/);
+  f.tick(1);
+  assert.equal(f.store.submit(f.second, 'Đường Kách mệnh').correct, true);
+});
+
+test('score trap deducts 100 points only on the first wrong answer', () => {
+  const f = fixture(['trap', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus']);
+  reachPreparation(f);
+  f.store.prepare(f.first, { item: 'trap', targetId: f.second.player.id });
+  f.store.prepare(f.second);
+  f.store.begin(f.host);
+  assert.equal(f.store.state(f.second).me.trapArmed, true);
+  f.store.submit(f.second, 'sai lần một');
+  assert.equal(f.store.state(f.second).players.find(p => p.id === f.second.player.id).score, -100);
+  assert.equal(f.store.state(f.second).me.trapArmed, false);
+  assert.match(f.store.state(f.second).me.feedback.text, /−100 điểm/);
+  f.tick(2_000);
+  f.store.submit(f.second, 'sai lần hai');
+  assert.equal(f.store.state(f.second).players.find(p => p.id === f.second.player.id).score, -100);
+});
+
+test('shield blocks a score trap', () => {
+  const f = fixture(['shield', 'bonus', 'bonus', 'bonus', 'bonus', 'trap', 'bonus', 'bonus', 'bonus', 'bonus']);
+  reachPreparation(f);
+  f.store.prepare(f.first, { item: 'shield' });
+  f.store.prepare(f.second, { item: 'trap', targetId: f.first.player.id });
+  f.store.begin(f.host);
+  assert.equal(f.store.state(f.first).me.shieldReady, false);
+  assert.equal(f.store.state(f.first).me.trapArmed, false);
+  f.store.submit(f.first, 'sai');
+  assert.equal(f.store.state(f.first).players.find(p => p.id === f.first.player.id).score, 0);
+});
+
+test('a target can receive at most one attack per question', () => {
+  const queue = ['trap', 'bonus', 'bonus', 'bonus', 'bonus', 'freeze', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus', 'bonus'];
+  const store = new GameStore({ questions, chooseItem: () => queue.shift() || 'bonus' });
+  const room = store.create({ durationSec: 10 });
+  const first = store.auth(room.code, store.join(room.code, 'Nhóm Một').token);
+  const second = store.auth(room.code, store.join(room.code, 'Nhóm Hai').token);
+  const target = store.auth(room.code, store.join(room.code, 'Nhóm Ba').token);
+  const host = store.auth(room.code, room.token);
+  store.next(host);
+  spinFive(store, first); spinFive(store, second); spinFive(store, target);
+  store.begin(host);
+  store.prepare(first, { item: 'trap', targetId: target.player.id });
+  assert.throws(() => store.prepare(second, { item: 'freeze', targetId: target.player.id }), /đã chịu một đòn/);
+  assert.ok(store.state(second).me.inventory.includes('freeze'));
+});
+
 test('hint reveals only to owner and bonus adds 200 after correct answer', () => {
   const f = fixture(['hint', 'shield', 'shield', 'shield', 'shield', 'bonus', 'fog', 'fog', 'fog', 'fog']);
   reachPreparation(f);

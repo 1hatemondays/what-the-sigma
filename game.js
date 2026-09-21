@@ -1,11 +1,15 @@
 import { randomBytes, randomInt } from 'node:crypto';
 
 export const ITEM = Object.freeze({
-  shield: { name: 'Khiên', icon: '◈', description: 'Chặn một đòn Màn sương.' },
+  shield: { name: 'Khiên', icon: '◈', description: 'Chặn một chức năng tấn công.' },
   hint: { name: 'Gợi ý', icon: '✦', description: 'Hé thêm 2 chữ chỉ cho nhóm bạn.' },
   bonus: { name: 'Cộng điểm', icon: '✚', description: 'Thêm 200 điểm nếu trả lời đúng.' },
-  fog: { name: 'Màn sương', icon: '◌', description: 'Che ô chữ của một đối thủ trong 3 giây.' }
+  fog: { name: 'Màn sương', icon: '◌', description: 'Che ô chữ của một đối thủ trong 3 giây.' },
+  freeze: { name: 'Đóng băng', icon: '❄', description: 'Khóa trả lời của một đối thủ trong 3 giây đầu.' },
+  trap: { name: 'Bẫy điểm', icon: '⚠', description: 'Trừ 100 điểm khi đối thủ trả lời sai lần đầu.' }
 });
+
+const ATTACK_ITEMS = new Set(['fog', 'freeze', 'trap']);
 
 export class GameError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -40,7 +44,7 @@ function validQuestions(questions) {
 }
 
 export class GameStore {
-  constructor({ questions, now = () => Date.now(), chooseItem = () => Object.keys(ITEM)[randomInt(4)] } = {}) {
+  constructor({ questions, now = () => Date.now(), chooseItem = () => Object.keys(ITEM)[randomInt(Object.keys(ITEM).length)] } = {}) {
     this.rooms = new Map();
     this.seed = validQuestions(questions ?? [{ prompt: 'Câu hỏi mẫu', answer: 'Đáp án', explanation: '', source: '', aliases: [] }]);
     this.now = now;
@@ -81,7 +85,7 @@ export class GameStore {
     if (name.length < 2) throw new GameError('Tên nhóm cần ít nhất 2 ký tự.');
     if (room.players.some(p => p.name.toLocaleLowerCase('vi') === name.toLocaleLowerCase('vi'))) throw new GameError('Tên nhóm đã được dùng trong phòng.');
     if (room.players.length >= 20) throw new GameError('Phòng đã đủ 20 nhóm.');
-    const player = { id: randomBytes(8).toString('hex'), token: token(), name, score: 0, inventory: [], spins: 0, prepared: false, selectedItem: null, selectedTargetId: null, bonusReady: false, shieldReady: false, fogUntil: 0, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null };
+    const player = { id: randomBytes(8).toString('hex'), token: token(), name, score: 0, inventory: [], spins: 0, prepared: false, selectedItem: null, selectedTargetId: null, bonusReady: false, shieldReady: false, fogUntil: 0, freezeUntil: 0, trapArmed: false, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null };
     room.players.push(player); room.version++;
     return { code: room.code, token: player.token };
   }
@@ -127,7 +131,7 @@ export class GameStore {
   prepareRound(r) {
     r.index++;
     r.phase = 'prepare'; r.startedAt = null; r.endedAt = null;
-    for (const p of r.players) Object.assign(p, { prepared: false, selectedItem: null, selectedTargetId: null, bonusReady: false, shieldReady: false, fogUntil: 0, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null });
+    for (const p of r.players) Object.assign(p, { prepared: false, selectedItem: null, selectedTargetId: null, bonusReady: false, shieldReady: false, fogUntil: 0, freezeUntil: 0, trapArmed: false, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null });
     r.version++;
   }
 
@@ -163,13 +167,15 @@ export class GameStore {
       if (!ITEM[item]) throw new GameError('Chức năng không hợp lệ.');
       const inventoryIndex = p.inventory.indexOf(item);
       if (inventoryIndex < 0) throw new GameError('Chức năng này không còn trong kho.');
-      if (item === 'fog') {
+      if (ATTACK_ITEMS.has(item)) {
         const target = r.players.find(x => x.id === targetId);
         if (!target || target === p) throw new GameError('Hãy chọn một nhóm đối thủ.');
+        const alreadyTargeted = r.players.some(x => x !== p && ATTACK_ITEMS.has(x.selectedItem) && x.selectedTargetId === targetId);
+        if (alreadyTargeted) throw new GameError('Nhóm này đã chịu một đòn tấn công trong câu. Hãy chọn nhóm khác.');
       }
       p.inventory.splice(inventoryIndex, 1);
       p.selectedItem = item;
-      p.selectedTargetId = item === 'fog' ? targetId : null;
+      p.selectedTargetId = ATTACK_ITEMS.has(item) ? targetId : null;
     }
     p.prepared = true;
     p.feedback = { kind: 'info', text: item ? `Đã chọn chức năng ${ITEM[item].name} cho câu này.` : 'Nhóm sẽ không dùng chức năng ở câu này.' };
@@ -212,16 +218,22 @@ export class GameStore {
         p.hintIndexes = Array.from(q.answer.normalize('NFC')).map((c, i) => /\p{L}|\p{N}/u.test(c) ? i : -1).filter(i => i >= 0).slice(0, 2);
       }
     }
-    for (const p of r.players) if (p.selectedItem === 'fog') {
+    for (const p of r.players) if (ATTACK_ITEMS.has(p.selectedItem)) {
       const target = r.players.find(x => x.id === p.selectedTargetId);
       if (!target) continue;
       if (target.shieldReady) {
         target.shieldReady = false;
-        p.feedback = { kind: 'info', text: `Khiên của ${target.name} đã chặn Màn sương.` };
-        target.feedback = { kind: 'info', text: `Khiên đã chặn Màn sương từ ${p.name}.` };
-      } else {
+        p.feedback = { kind: 'info', text: `Khiên của ${target.name} đã chặn ${ITEM[p.selectedItem].name}.` };
+        target.feedback = { kind: 'info', text: `Khiên đã chặn ${ITEM[p.selectedItem].name} từ ${p.name}.` };
+      } else if (p.selectedItem === 'fog') {
         target.fogUntil = Math.max(target.fogUntil, r.startedAt + 3000);
         p.feedback = { kind: 'info', text: `Đã che ô chữ của ${target.name} trong 3 giây.` };
+      } else if (p.selectedItem === 'freeze') {
+        target.freezeUntil = Math.max(target.freezeUntil, r.startedAt + 3000);
+        p.feedback = { kind: 'info', text: `Đã đóng băng ${target.name} trong 3 giây đầu.` };
+      } else if (p.selectedItem === 'trap') {
+        target.trapArmed = true;
+        p.feedback = { kind: 'info', text: `Đã đặt Bẫy điểm lên ${target.name}.` };
       }
     }
   }
@@ -239,12 +251,14 @@ export class GameStore {
     if (r.phase !== 'question') throw new GameError('Câu hỏi đã đóng.');
     if (p.solvedAt !== null) throw new GameError('Nhóm đã trả lời đúng câu này.');
     const now = this.now();
+    if (now < (p.freezeUntil || 0)) throw new GameError('Nhóm đang bị Đóng băng. Hãy chờ hết 3 giây đầu.');
     if (now < p.wrongUntil) throw new GameError('Vui lòng đợi một chút trước khi thử lại.');
     const response = normalizeAnswer(answer);
     if (!response) throw new GameError('Hãy nhập đáp án.');
     const q = r.questions[r.index];
     const accepted = [q.answer, ...q.aliases].some(a => normalizeAnswer(a) === response);
     if (accepted) {
+      p.trapArmed = false;
       p.solvedAt = now;
       p.roundPoints = scoreFor(now - r.startedAt, r.durationSec) + (p.bonusReady ? 200 : 0);
       p.score += p.roundPoints;
@@ -252,7 +266,13 @@ export class GameStore {
       if (r.players.every(x => x.solvedAt !== null)) this.reveal(r);
     } else {
       p.wrongUntil = now + 2000;
-      p.feedback = { kind: 'wrong', text: 'Chưa đúng. Thử lại sau 2 giây.' };
+      if (p.trapArmed) {
+        p.trapArmed = false;
+        p.score -= 100;
+        p.feedback = { kind: 'wrong', text: 'Chưa đúng. Bẫy điểm đã kích hoạt: −100 điểm. Thử lại sau 2 giây.' };
+      } else {
+        p.feedback = { kind: 'wrong', text: 'Chưa đúng. Thử lại sau 2 giây.' };
+      }
     }
     r.version++;
     return { correct: accepted, feedback: p.feedback };
@@ -271,7 +291,7 @@ export class GameStore {
     });
     const state = { code: r.code, role, phase: r.phase, durationSec: r.durationSec, questionIndex: r.index, totalQuestions: r.questions.length, version: r.version, serverNow: this.now(), startedAt: r.startedAt, endedAt: r.endedAt, players, itemCatalog: ITEM };
     if (role === 'host') state.questions = r.questions;
-    if (player) state.me = { id: player.id, name: player.name, inventory: [...player.inventory], spins: player.spins, prepared: player.prepared, selectedItem: player.selectedItem, bonusReady: player.bonusReady, shieldReady: player.shieldReady, fogUntil: player.fogUntil, solved: player.solvedAt !== null, roundPoints: player.roundPoints, wrongUntil: player.wrongUntil, feedback: player.feedback };
+    if (player) state.me = { id: player.id, name: player.name, inventory: [...player.inventory], spins: player.spins, prepared: player.prepared, selectedItem: player.selectedItem, bonusReady: player.bonusReady, shieldReady: player.shieldReady, fogUntil: player.fogUntil, freezeUntil: player.freezeUntil || 0, trapArmed: Boolean(player.trapArmed), solved: player.solvedAt !== null, roundPoints: player.roundPoints, wrongUntil: player.wrongUntil, feedback: player.feedback };
     if (q && (role === 'host' || !['wheel', 'prepare'].includes(r.phase))) {
       const fullyRevealed = ['reveal', 'final'].includes(r.phase);
       const revealed = r.phase === 'question' && !q.images?.length ? Math.max(0, Math.floor((this.now() - r.startedAt) / 1000)) : fullyRevealed ? Infinity : 0;

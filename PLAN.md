@@ -18,7 +18,7 @@ Webgame tiếng Việt cho môn Tư tưởng Hồ Chí Minh. Mỗi nhóm chơi t
 - Máy chủ xác định thời điểm bắt đầu, lượt quay, vật phẩm, đáp án và điểm. Không gửi đáp án đầy đủ cho người chơi khi câu chưa kết thúc.
 - Chuẩn hóa đáp án: không phân biệt hoa/thường, dấu tiếng Việt, khoảng trắng dư; hỗ trợ đáp án tương đương do người dẫn khai báo.
 - Mỗi nhóm nhận 5 chức năng trước trận; chức năng có thể trùng và được tích lũy trong kho. Mỗi câu dùng tối đa một chức năng, hoặc bỏ qua để giữ lại.
-- Khiên: chặn một đòn; Gợi ý: hé thêm 2 chữ riêng cho nhóm; Cộng điểm: +200 nếu đúng; Màn sương: che phần ô chữ của một đối thủ 3 giây, không khóa nhập đáp án. Hiệu ứng được giải quyết khi câu hỏi bắt đầu.
+- Khiên: chặn một đòn; Gợi ý: hé thêm 2 chữ riêng cho nhóm; Cộng điểm: +200 nếu đúng; Màn sương: che phần ô chữ của một đối thủ 3 giây; Đóng băng: khóa trả lời đối thủ trong 3 giây đầu; Bẫy điểm: trừ 100 điểm khi đối thủ trả lời sai lần đầu. Một nhóm chỉ chịu tối đa một đòn tấn công trong mỗi câu. Hiệu ứng được giải quyết khi câu hỏi bắt đầu.
 - Không được nhắm chính mình hoặc chọn chức năng không còn trong kho.
 - Các nhóm hòa điểm có cùng hạng; thứ tự hiển thị ổn định.
 
