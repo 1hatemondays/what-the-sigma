@@ -98,6 +98,9 @@ test('image questions keep safe local image metadata without exposing the answer
   assert.deepEqual(state.question.images, ['/question-images/baucu.jpg']);
   assert.equal(state.question.imageAlt, 'Hòm phiếu');
   assert.equal(state.question.answer, undefined);
+  time += 5_000;
+  const timedState = store.state(playerAuth);
+  assert.equal(timedState.question.slots.filter(slot => slot.open && !slot.separator).length, 0);
   assert.throws(() => new GameStore({ questions: [{ ...imageQuestion, images: ['https://example.org/image.jpg'] }] }), /question-images/);
 });
 

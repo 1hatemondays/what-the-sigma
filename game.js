@@ -273,13 +273,14 @@ export class GameStore {
     if (role === 'host') state.questions = r.questions;
     if (player) state.me = { id: player.id, name: player.name, inventory: [...player.inventory], spins: player.spins, prepared: player.prepared, selectedItem: player.selectedItem, bonusReady: player.bonusReady, shieldReady: player.shieldReady, fogUntil: player.fogUntil, solved: player.solvedAt !== null, roundPoints: player.roundPoints, wrongUntil: player.wrongUntil, feedback: player.feedback };
     if (q && (role === 'host' || !['wheel', 'prepare'].includes(r.phase))) {
-      const revealed = r.phase === 'question' ? Math.max(0, Math.floor((this.now() - r.startedAt) / 1000)) : ['reveal', 'final'].includes(r.phase) ? Infinity : 0;
+      const fullyRevealed = ['reveal', 'final'].includes(r.phase);
+      const revealed = r.phase === 'question' && !q.images?.length ? Math.max(0, Math.floor((this.now() - r.startedAt) / 1000)) : fullyRevealed ? Infinity : 0;
       const chars = Array.from(q.answer.normalize('NFC'));
       let count = 0;
       const slots = chars.map((ch, i) => {
         if (!/\p{L}|\p{N}/u.test(ch)) return { text: ch, open: true, separator: true };
         const hinted = Boolean(player && player.hintIndexes.includes(i));
-        const open = hinted || count < revealed || ['reveal', 'final'].includes(r.phase);
+        const open = hinted || count < revealed || fullyRevealed;
         if (!hinted) count += 1;
         return { text: open ? ch : '', open, separator: false };
       });

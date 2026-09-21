@@ -2,6 +2,7 @@ const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
 const toastNode = document.getElementById('toast');
 const STORE_KEY = 'dau-an-hcm-session';
+const IMAGE_REVEAL_MS = 6_000;
 let session = loadSession();
 let state = null;
 let networkInfo = { lanUrls: [] };
@@ -33,7 +34,7 @@ function scoreMeterValues() {
 }
 function imageRevealProgress() {
   if (state.phase !== 'question') return 1;
-  return Math.max(0, Math.min(1, (nowServer() - state.startedAt) / (state.durationSec * 1000)));
+  return Math.max(0, Math.min(1, (nowServer() - state.startedAt) / IMAGE_REVEAL_MS));
 }
 function imageRevealStyle(progress = imageRevealProgress()) {
   return `--image-progress:${progress};--image-blur:${(1 - progress) * 24}px;--image-scale:${1.06 - progress * .06};--image-veil-opacity:${(1 - progress) * .82}`;
@@ -174,7 +175,7 @@ function questionPage() {
   const scoreLabel = state.me?.solved ? 'Điểm nhóm đã nhận' : 'Điểm nếu trả lời đúng ngay';
   const image = q.images?.length ? `<figure class="image-question" style="${imageRevealStyle()}"><div class="image-frame ${q.images.length > 1 ? 'image-pair' : ''}">${q.images.map((src, index) => `<img src="${esc(src)}" alt="${esc(q.imageAlt)}${q.images.length > 1 ? `, ảnh ${index + 1}` : ''}">`).join('')}<span class="image-veil" aria-hidden="true"></span></div><figcaption>Hình ảnh sẽ hiện rõ dần theo thời gian</figcaption></figure>` : '';
   const form = host ? '<p class="hint-line">Câu hỏi sẽ tự kết thúc khi hết giờ hoặc tất cả nhóm trả lời đúng.</p>' : state.me.solved ? `<div class="feedback correct">Nhóm bạn đã trả lời đúng và nhận ${state.me.roundPoints} điểm. Chờ các nhóm khác.</div>` : `<form id="answer-form" class="answer-form"><input class="input" id="answer-input" name="answer" maxlength="100" autocomplete="off" autocapitalize="sentences" placeholder="Nhập đáp án của nhóm..." aria-label="Nhập đáp án" required><button class="btn" type="submit" ${wrongWait ? 'disabled' : ''}>Trả lời →</button></form>${feedback}`;
-  const main = `<div class="panel"><div class="timer-row"><div><div class="kicker">Câu ${state.questionIndex + 1} / ${state.totalQuestions}</div><div class="muted">${q.images?.length ? 'Ảnh và ô chữ hiện rõ dần' : 'Mỗi giây hé một ký tự'}</div></div><div class="timer ${timeLeft <= 5 ? 'urgent' : ''}">${String(timeLeft).padStart(2, '0')}<small> giây</small></div></div><div class="timer-track"><div class="timer-fill" style="width:${percent}%"></div></div><div class="score-meter"><div class="score-meter-head"><span>${scoreLabel}${scoreMeter.bonus ? ' · Đã cộng 200 điểm chức năng' : ''}</span><strong class="live-score">${scoreMeter.score} điểm</strong></div><div class="score-track"><div class="score-fill" style="width:${scoreMeter.percent}%"></div></div></div><h3 class="question-heading">${esc(q.prompt)}</h3>${image}<div class="slots ${fog ? 'fogged' : ''}" aria-label="Ô chữ đáp án">${slotsHtml(q.slots)}</div>${fog ? '<p class="hint-line">Màn sương đang che ô chữ. Bạn vẫn có thể nhập đáp án.</p>' : ''}${form}</div>`;
+  const main = `<div class="panel"><div class="timer-row"><div><div class="kicker">Câu ${state.questionIndex + 1} / ${state.totalQuestions}</div><div class="muted">${q.images?.length ? 'Quan sát hình ảnh và đoán đáp án' : 'Mỗi giây hé một ký tự'}</div></div><div class="timer ${timeLeft <= 5 ? 'urgent' : ''}">${String(timeLeft).padStart(2, '0')}<small> giây</small></div></div><div class="timer-track"><div class="timer-fill" style="width:${percent}%"></div></div><div class="score-meter"><div class="score-meter-head"><span>${scoreLabel}${scoreMeter.bonus ? ' · Đã cộng 200 điểm chức năng' : ''}</span><strong class="live-score">${scoreMeter.score} điểm</strong></div><div class="score-track"><div class="score-fill" style="width:${scoreMeter.percent}%"></div></div></div>${q.images?.length ? '' : `<h3 class="question-heading">${esc(q.prompt)}</h3>`}${image}<div class="slots ${fog ? 'fogged' : ''}" aria-label="Ô chữ đáp án">${slotsHtml(q.slots)}</div>${fog ? '<p class="hint-line">Màn sương đang che ô chữ. Bạn vẫn có thể nhập đáp án.</p>' : ''}${form}</div>`;
   return page(`${intro('Giải ô chữ', 'Trả lời càng sớm, điểm càng cao.', 'Thử thách đang diễn ra')}<div class="layout"><main>${main}</main><aside><div class="panel"><div class="panel-title">${host ? 'Bảng xếp hạng' : 'Chức năng của câu này'}</div>${host ? playerList() : itemCard(item, Boolean(item))}</div>${host ? '' : `<div class="panel"><div class="panel-title">Bảng xếp hạng</div>${playerList()}</div>`}</aside></div>`, true);
 }
 function sourceHtml(q) { const href = safeHref(q.source); return href ? `<p class="source">Nguồn tham khảo: <a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(q.source)}</a></p>` : ''; }
