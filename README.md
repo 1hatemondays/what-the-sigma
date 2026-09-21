@@ -20,11 +20,13 @@ Người dẫn có thể chỉnh câu hỏi, đáp án tương đương, giải 
 - Đáp án không phân biệt hoa/thường, dấu tiếng Việt và khoảng trắng dư. Người dẫn có thể thêm các cách viết tương đương.
 - Nhóm bằng điểm cùng thứ hạng. Máy chủ quyết định lượt quay, thời gian, đáp án và điểm.
 
-## Giới hạn triển khai
+## Triển khai Vercel
 
-Phòng, tên nhóm, câu hỏi đã sửa và điểm chỉ lưu trong bộ nhớ của tiến trình Node.js. Đóng cửa sổ máy chủ hoặc khởi động lại sẽ mất các phòng đang chơi. Thiết bị phải truy cập được máy chủ qua cùng mạng; ứng dụng chưa có máy chủ công khai. Mỗi thiết bị lưu khóa tham gia trong trình duyệt để tải lại trang và tiếp tục. Người dẫn nên dùng cùng trình duyệt/tab đã tạo phòng.
+Bản công khai dùng Vercel Functions và Upstash Redis để mọi nhóm thấy cùng một phòng, kể cả khi Vercel chạy nhiều phiên máy chủ. Tạo project Vercel từ repository này, vào **Storage → Create Database → Upstash for Redis**, chọn gói **Free**, vùng **Singapore (sin1)**, tắt tự động nâng cấp gói và kết nối với project. Vercel tự thêm `KV_REST_API_URL` và `KV_REST_API_TOKEN` cho project. Thêm `HOST_PASSWORD` dưới dạng **Secret** cho Production (và Preview nếu dùng), rồi deploy lại. Không đưa các giá trị bí mật vào Git.
 
-Không triển khai bản hiện tại trực tiếp lên Vercel để chơi thật: Vercel Functions có thể tạo nhiều instance và thu hồi instance, trong khi trạng thái trận đấu hiện chỉ nằm trong RAM. Muốn dùng Vercel cần chuyển `GameStore` sang kho dữ liệu dùng chung như Redis/Postgres và tạo Vercel Function handler. Trên Vercel, đặt `HOST_PASSWORD` trong **Project Settings → Environment Variables**, bật **Sensitive** cho Preview/Production, rồi redeploy; không đặt giá trị trong `vercel.json`.
+Người dẫn mở trang công khai, chọn **Tạo phòng chơi** và nhập mật khẩu người dẫn. Chia sẻ mã phòng hoặc liên kết cho các nhóm; các nhóm có thể tham gia từ mạng khác nhau. Phòng hết hạn sau 48 giờ không có thay đổi; hãy tạo phòng mới cho buổi học tiếp theo. Mỗi thiết bị giữ khóa tham gia trong trình duyệt để tải lại trang và tiếp tục.
+
+Bản chạy bằng `npm start` vẫn phục vụ trên mạng nội bộ và giữ phòng trong RAM; đóng máy chủ sẽ mất phòng local. Bản Vercel lưu phòng trong Redis. Mật khẩu local trong `.host-password` tách biệt với biến `HOST_PASSWORD` trên Vercel.
 
 ## Kiểm tra
 

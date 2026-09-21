@@ -3,6 +3,10 @@ node_modules/
 .env.*
 !.env.example
 .host-password
+.vercel-host-password
 .vercel/
+public/
 *.log
 .playwright-mcp/
+.agents/
+skills-lock.json
