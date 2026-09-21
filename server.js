@@ -62,7 +62,7 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
       }
       if (req.method === 'GET' && url.pathname === '/api/info') return json(res, 200, { lanUrls: lanAddresses(server.address()?.port || port) });
       if (req.method === 'POST' && url.pathname === '/api/rooms') return json(res, 201, store.create(await body(req)));
-      const match = url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|state|config|next|spin|spin-missing|begin|answer|item))?$/);
+      const match = url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|state|config|next|spin|spin-missing|prepare|prepare-missing|begin|answer))?$/);
       if (!match) return json(res, 404, { error: 'Không tìm thấy trang.' });
       const [, code, action] = match;
       if (req.method === 'POST' && action === 'join') return json(res, 201, store.join(code, (await body(req)).name));
@@ -74,9 +74,10 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
       else if (action === 'next') store.next(auth);
       else if (action === 'spin') result = store.spin(auth);
       else if (action === 'spin-missing') store.spinMissing(auth);
+      else if (action === 'prepare') result = store.prepare(auth, await body(req));
+      else if (action === 'prepare-missing') store.prepareMissing(auth);
       else if (action === 'begin') store.begin(auth);
       else if (action === 'answer') result = store.submit(auth, (await body(req)).answer);
-      else if (action === 'item') result = store.useItem(auth, (await body(req)).targetId);
       else return json(res, 404, { error: 'Không tìm thấy thao tác.' });
       return json(res, 200, result);
     } catch (error) {

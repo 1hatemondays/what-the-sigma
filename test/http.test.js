@@ -26,12 +26,19 @@ test('HTTP flow: create, join two groups, protect state, answer, reconnect', asy
     await request(prefix + '/next', 'POST', created.token, {});
     const wheel = (await request(prefix + '/state', 'GET', a.token)).data;
     assert.ok(!JSON.stringify(wheel).includes('Nguyễn Sinh Cung'));
-    await request(prefix + '/spin', 'POST', a.token, {});
-    await request(prefix + '/spin', 'POST', b.token, {});
+    for (let i = 0; i < 5; i++) {
+      await request(prefix + '/spin', 'POST', a.token, {});
+      await request(prefix + '/spin', 'POST', b.token, {});
+    }
+    await request(prefix + '/begin', 'POST', created.token, {});
+    const preparation = (await request(prefix + '/state', 'GET', a.token)).data;
+    assert.equal(preparation.phase, 'prepare');
+    assert.ok(!JSON.stringify(preparation).includes('Nguyễn Sinh Cung'));
+    await request(prefix + '/prepare', 'POST', a.token, { item: 'bonus' });
+    await request(prefix + '/prepare', 'POST', b.token, {});
     await request(prefix + '/begin', 'POST', created.token, {});
     const inRound = (await request(prefix + '/state', 'GET', a.token)).data;
     assert.ok(!JSON.stringify(inRound).includes('Nguyễn Sinh Cung'));
-    await request(prefix + '/item', 'POST', a.token, {});
     time += 1_000;
     const correct = await request(prefix + '/answer', 'POST', a.token, { answer: 'nguyen sinh cung' });
     assert.equal(correct.data.correct, true);

@@ -78,7 +78,7 @@ export class GameStore {
     if (name.length < 2) throw new GameError('Tên nhóm cần ít nhất 2 ký tự.');
     if (room.players.some(p => p.name.toLocaleLowerCase('vi') === name.toLocaleLowerCase('vi'))) throw new GameError('Tên nhóm đã được dùng trong phòng.');
     if (room.players.length >= 20) throw new GameError('Phòng đã đủ 20 nhóm.');
-    const player = { id: randomBytes(8).toString('hex'), token: token(), name, score: 0, item: null, itemUsed: false, bonusReady: false, shieldReady: false, fogUntil: 0, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null };
+    const player = { id: randomBytes(8).toString('hex'), token: token(), name, score: 0, inventory: [], spins: 0, prepared: false, selectedItem: null, selectedTargetId: null, bonusReady: false, shieldReady: false, fogUntil: 0, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null };
     room.players.push(player); room.version++;
     return { code: room.code, token: player.token };
   }
@@ -102,12 +102,19 @@ export class GameStore {
   next(auth) {
     this.requireHost(auth);
     const r = auth.room;
-    if (r.phase === 'lobby' && r.players.length < 1) throw new GameError('Cần ít nhất một nhóm tham gia.');
-    if (!['lobby', 'reveal'].includes(r.phase)) throw new GameError('Chưa thể chuyển câu lúc này.');
+    if (r.phase === 'lobby') {
+      if (r.players.length < 1) throw new GameError('Cần ít nhất một nhóm tham gia.');
+      r.phase = 'wheel'; r.version++; return;
+    }
+    if (r.phase !== 'reveal') throw new GameError('Chưa thể chuyển câu lúc này.');
     if (r.index + 1 >= r.questions.length) { r.phase = 'final'; r.version++; return; }
+    this.prepareRound(r);
+  }
+
+  prepareRound(r) {
     r.index++;
-    r.phase = 'wheel'; r.startedAt = null; r.endedAt = null;
-    for (const p of r.players) Object.assign(p, { item: null, itemUsed: false, bonusReady: false, shieldReady: false, fogUntil: 0, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null });
+    r.phase = 'prepare'; r.startedAt = null; r.endedAt = null;
+    for (const p of r.players) Object.assign(p, { prepared: false, selectedItem: null, selectedTargetId: null, bonusReady: false, shieldReady: false, fogUntil: 0, hintIndexes: [], solvedAt: null, roundPoints: 0, wrongUntil: 0, feedback: null });
     r.version++;
   }
 
@@ -115,27 +122,95 @@ export class GameStore {
     this.requirePlayer(auth);
     const { room: r, player: p } = auth;
     if (r.phase !== 'wheel') throw new GameError('Chưa đến lượt quay.');
-    if (p.item) throw new GameError('Mỗi nhóm chỉ quay một lần mỗi câu.');
+    if (p.spins >= 5) throw new GameError('Nhóm đã quay đủ 5 lượt.');
     const item = this.chooseItem();
     if (!ITEM[item]) throw new Error('Invalid item generator');
-    p.item = item; r.version++;
-    return { item };
+    p.inventory.push(item); p.spins++; r.version++;
+    return { item, spins: p.spins };
   }
 
   spinMissing(auth) {
     this.requireHost(auth);
     const r = auth.room;
-    if (r.phase !== 'wheel') throw new GameError('Chỉ quay hộ trong lượt vòng quay.');
-    for (const p of r.players) if (!p.item) p.item = this.chooseItem();
+    if (r.phase !== 'wheel') throw new GameError('Chỉ quay hộ trong giai đoạn vòng quay.');
+    for (const p of r.players) while (p.spins < 5) {
+      const item = this.chooseItem();
+      if (!ITEM[item]) throw new Error('Invalid item generator');
+      p.inventory.push(item); p.spins++;
+    }
+    r.version++;
+  }
+
+  prepare(auth, { item = null, targetId = null } = {}) {
+    this.requirePlayer(auth);
+    const { room: r, player: p } = auth;
+    if (r.phase !== 'prepare') throw new GameError('Chưa đến lúc chọn perk.');
+    if (p.prepared) throw new GameError('Nhóm đã chốt lựa chọn cho câu này.');
+    if (item !== null) {
+      if (!ITEM[item]) throw new GameError('Perk không hợp lệ.');
+      const inventoryIndex = p.inventory.indexOf(item);
+      if (inventoryIndex < 0) throw new GameError('Perk này không còn trong kho.');
+      if (item === 'fog') {
+        const target = r.players.find(x => x.id === targetId);
+        if (!target || target === p) throw new GameError('Hãy chọn một nhóm đối thủ.');
+      }
+      p.inventory.splice(inventoryIndex, 1);
+      p.selectedItem = item;
+      p.selectedTargetId = item === 'fog' ? targetId : null;
+    }
+    p.prepared = true;
+    p.feedback = { kind: 'info', text: item ? `Đã chọn ${ITEM[item].name} cho câu này.` : 'Nhóm sẽ không dùng perk ở câu này.' };
+    r.version++;
+    return { selectedItem: p.selectedItem };
+  }
+
+  prepareMissing(auth) {
+    this.requireHost(auth);
+    const r = auth.room;
+    if (r.phase !== 'prepare') throw new GameError('Chỉ có thể bỏ qua hộ trong giai đoạn chuẩn bị.');
+    for (const p of r.players) if (!p.prepared) {
+      p.prepared = true;
+      p.feedback = { kind: 'info', text: 'Người dẫn đã chọn bỏ qua perk cho câu này.' };
+    }
     r.version++;
   }
 
   begin(auth) {
     this.requireHost(auth);
     const r = auth.room;
-    if (r.phase !== 'wheel') throw new GameError('Chưa đến lúc bắt đầu câu.');
-    if (r.players.some(p => !p.item)) throw new GameError('Hãy đợi tất cả nhóm quay vòng quay.');
-    r.phase = 'question'; r.startedAt = this.now(); r.version++;
+    if (r.phase === 'wheel') {
+      if (r.players.some(p => p.spins < 5)) throw new GameError('Hãy đợi tất cả nhóm quay đủ 5 lượt.');
+      this.prepareRound(r);
+      return;
+    }
+    if (r.phase !== 'prepare') throw new GameError('Chưa đến lúc bắt đầu câu.');
+    if (r.players.some(p => !p.prepared)) throw new GameError('Hãy đợi tất cả nhóm chọn perk hoặc bỏ qua.');
+    r.phase = 'question'; r.startedAt = this.now();
+    this.activatePerks(r);
+    r.version++;
+  }
+
+  activatePerks(r) {
+    const q = r.questions[r.index];
+    for (const p of r.players) {
+      if (p.selectedItem === 'bonus') p.bonusReady = true;
+      if (p.selectedItem === 'shield') p.shieldReady = true;
+      if (p.selectedItem === 'hint') {
+        p.hintIndexes = Array.from(q.answer.normalize('NFC')).map((c, i) => /\p{L}|\p{N}/u.test(c) ? i : -1).filter(i => i >= 0).slice(0, 2);
+      }
+    }
+    for (const p of r.players) if (p.selectedItem === 'fog') {
+      const target = r.players.find(x => x.id === p.selectedTargetId);
+      if (!target) continue;
+      if (target.shieldReady) {
+        target.shieldReady = false;
+        p.feedback = { kind: 'info', text: `Khiên của ${target.name} đã chặn Màn sương.` };
+        target.feedback = { kind: 'info', text: `Khiên đã chặn Màn sương từ ${p.name}.` };
+      } else {
+        target.fogUntil = Math.max(target.fogUntil, r.startedAt + 3000);
+        p.feedback = { kind: 'info', text: `Đã che ô chữ của ${target.name} trong 3 giây.` };
+      }
+    }
   }
 
   advanceIfDue(r) {
@@ -170,38 +245,6 @@ export class GameStore {
     return { correct: accepted, feedback: p.feedback };
   }
 
-  useItem(auth, targetId) {
-    this.requirePlayer(auth);
-    const { room: r, player: p } = auth;
-    this.advanceIfDue(r);
-    if (r.phase !== 'question' || p.solvedAt !== null) throw new GameError('Vật phẩm chỉ dùng khi nhóm đang giải câu hỏi.');
-    if (!p.item || p.itemUsed) throw new GameError('Vật phẩm đã được dùng.');
-    const q = r.questions[r.index];
-    let message;
-    switch (p.item) {
-      case 'hint': {
-        const chars = Array.from(q.answer.normalize('NFC'));
-        const globalRevealed = Math.min(Math.floor((this.now() - r.startedAt) / 1000), chars.filter(c => /\p{L}|\p{N}/u.test(c)).length);
-        const candidates = chars.map((c, i) => /\p{L}|\p{N}/u.test(c) ? i : -1).filter(i => i >= 0).slice(globalRevealed);
-        p.hintIndexes = candidates.slice(0, 2);
-        message = 'Đã hé thêm tối đa 2 chữ.';
-        break;
-      }
-      case 'bonus': p.bonusReady = true; message = 'Thưởng 200 điểm nếu trả lời đúng.'; break;
-      case 'shield': p.shieldReady = true; message = 'Khiên đã sẵn sàng chặn một đòn.'; break;
-      case 'fog': {
-        const target = r.players.find(x => x.id === targetId);
-        if (!target || target === p || target.solvedAt !== null) throw new GameError('Hãy chọn một nhóm khác đang giải câu hỏi.');
-        if (target.shieldReady) { target.shieldReady = false; message = `Khiên của ${target.name} đã chặn Màn sương.`; }
-        else { target.fogUntil = this.now() + 3000; message = `Đã che ô chữ của ${target.name} trong 3 giây.`; }
-        break;
-      }
-      default: throw new GameError('Vật phẩm không hợp lệ.');
-    }
-    p.itemUsed = true; p.feedback = { kind: 'info', text: message }; r.version++;
-    return { message };
-  }
-
   state(auth) {
     const { room: r, role, player } = auth;
     this.advanceIfDue(r);
@@ -211,12 +254,12 @@ export class GameStore {
     const players = sorted.map((p, i) => {
       if (p.score !== lastScore) rank = i + 1;
       lastScore = p.score;
-      return { id: p.id, name: p.name, score: p.score, rank, spun: Boolean(p.item), solved: p.solvedAt !== null, roundPoints: r.phase === 'question' && role !== 'host' && p !== player ? null : p.roundPoints };
+      return { id: p.id, name: p.name, score: p.score, rank, spun: p.spins >= 5, spinCount: p.spins, prepared: p.prepared, solved: p.solvedAt !== null, roundPoints: r.phase === 'question' && role !== 'host' && p !== player ? null : p.roundPoints };
     });
     const state = { code: r.code, role, phase: r.phase, durationSec: r.durationSec, questionIndex: r.index, totalQuestions: r.questions.length, version: r.version, serverNow: this.now(), startedAt: r.startedAt, endedAt: r.endedAt, players, itemCatalog: ITEM };
     if (role === 'host') state.questions = r.questions;
-    if (player) state.me = { id: player.id, name: player.name, item: player.item, itemUsed: player.itemUsed, bonusReady: player.bonusReady, shieldReady: player.shieldReady, fogUntil: player.fogUntil, solved: player.solvedAt !== null, roundPoints: player.roundPoints, wrongUntil: player.wrongUntil, feedback: player.feedback };
-    if (q && (role === 'host' || !['wheel'].includes(r.phase))) {
+    if (player) state.me = { id: player.id, name: player.name, inventory: [...player.inventory], spins: player.spins, prepared: player.prepared, selectedItem: player.selectedItem, bonusReady: player.bonusReady, shieldReady: player.shieldReady, fogUntil: player.fogUntil, solved: player.solvedAt !== null, roundPoints: player.roundPoints, wrongUntil: player.wrongUntil, feedback: player.feedback };
+    if (q && (role === 'host' || !['wheel', 'prepare'].includes(r.phase))) {
       const revealed = r.phase === 'question' ? Math.max(0, Math.floor((this.now() - r.startedAt) / 1000)) : ['reveal', 'final'].includes(r.phase) ? Infinity : 0;
       const chars = Array.from(q.answer.normalize('NFC'));
       let count = 0;
