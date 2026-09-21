@@ -10,7 +10,14 @@ import { seedQuestions } from './seed.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const localPasswordFile = path.join(root, '.host-password');
-const staticFiles = { '/': ['index.html', 'text/html; charset=utf-8'], '/join': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'] };
+const staticFiles = {
+  '/': ['index.html', 'text/html; charset=utf-8'], '/join': ['index.html', 'text/html; charset=utf-8'],
+  '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'],
+  '/question-images/baucu.jpg': ['question-images/baucu.jpg', 'image/jpeg'],
+  '/question-images/06011946.jpg': ['question-images/06011946.jpg', 'image/jpeg'],
+  '/question-images/hienphap1946.jpg': ['question-images/hienphap1946.jpg', 'image/jpeg'],
+  '/question-images/hienphap1959.jpg': ['question-images/hienphap1959.jpg', 'image/jpeg']
+};
 
 function json(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });

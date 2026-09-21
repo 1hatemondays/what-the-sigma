@@ -29,10 +29,13 @@ function validQuestions(questions) {
     const answer = cleanText(q.answer, 80).normalize('NFC');
     const explanation = cleanText(q.explanation, 700);
     const source = cleanText(q.source, 400);
+    const images = (Array.isArray(q.images) ? q.images : q.image ? [q.image] : []).map(value => cleanText(value, 300)).filter(Boolean).slice(0, 2);
+    const imageAlt = cleanText(q.imageAlt, 180);
     const aliases = Array.isArray(q.aliases) ? q.aliases.map(a => cleanText(a, 80)).filter(Boolean).slice(0, 8) : [];
     if (!prompt || !answer || !normalizeAnswer(answer)) throw new GameError(`Câu ${index + 1} cần đề bài và đáp án hợp lệ.`);
     if (Array.from(answer).filter(ch => /\p{L}|\p{N}/u.test(ch)).length > 65) throw new GameError(`Đáp án câu ${index + 1} quá dài.`);
-    return { prompt, answer, explanation, source, aliases };
+    if (images.some(image => !/^\/question-images\/[a-z0-9_.-]+\.(?:png|jpe?g|webp|svg)$/i.test(image))) throw new GameError(`Ảnh câu ${index + 1} phải nằm trong thư mục question-images.`);
+    return { prompt, answer, explanation, source, aliases, ...(images.length ? { images, imageAlt: imageAlt || 'Hình ảnh gợi ý cho câu hỏi' } : {}) };
   });
 }
 
@@ -278,7 +281,7 @@ export class GameStore {
         const open = count++ < revealed || (player && player.hintIndexes.includes(i)) || ['reveal', 'final'].includes(r.phase);
         return { text: open ? ch : '', open, separator: false };
       });
-      state.question = { prompt: q.prompt, slots };
+      state.question = { prompt: q.prompt, slots, ...(q.images?.length ? { images: [...q.images], imageAlt: q.imageAlt } : {}) };
       if (['reveal', 'final'].includes(r.phase) || role === 'host') Object.assign(state.question, { answer: q.answer, aliases: q.aliases, explanation: q.explanation, source: q.source });
     }
     return state;

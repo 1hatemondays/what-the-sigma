@@ -1,6 +1,6 @@
 # Dấu ấn Hồ Chí Minh
 
-Webgame tiếng Việt dành cho lớp học Tư tưởng Hồ Chí Minh. Người dẫn mở phòng trên máy tính; mỗi nhóm dùng một laptop để tham gia bằng mã 6 số. Tám câu hỏi khởi đầu có thể chỉnh trong sảnh chờ.
+Webgame tiếng Việt dành cho lớp học Tư tưởng Hồ Chí Minh. Người dẫn mở phòng trên máy tính; mỗi nhóm dùng một laptop để tham gia bằng mã 6 số. Bộ 15 câu hỏi khởi đầu gồm 12 câu ô chữ và 3 câu ảnh hiện rõ dần; người dẫn có thể chỉnh nội dung trong sảnh chờ.
 
 ## Chạy trong lớp
 

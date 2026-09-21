@@ -79,5 +79,8 @@ test('HTTP JSON body handles split UTF-8 bytes and rejects null', async () => {
     assert.equal(invalid.status, 400);
     const joinPage = await fetch(`http://127.0.0.1:${port}/join`);
     assert.equal(joinPage.status, 200);
+    const questionImage = await fetch(`http://127.0.0.1:${port}/question-images/baucu.jpg`);
+    assert.equal(questionImage.status, 200);
+    assert.match(questionImage.headers.get('content-type'), /image\/jpeg/);
   } finally { server.close(); await once(server, 'close'); }
 });

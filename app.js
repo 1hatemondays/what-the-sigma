@@ -31,6 +31,13 @@ function scoreMeterValues() {
   const score = state.me?.solved ? state.me.roundPoints : liveBaseScore() + bonus;
   return { bonus, score, percent: Math.max(0, Math.min(100, 100 * score / (1000 + bonus))) };
 }
+function imageRevealProgress() {
+  if (state.phase !== 'question') return 1;
+  return Math.max(0, Math.min(1, (nowServer() - state.startedAt) / (state.durationSec * 1000)));
+}
+function imageRevealStyle(progress = imageRevealProgress()) {
+  return `--image-progress:${progress};--image-blur:${(1 - progress) * 24}px;--image-scale:${1.06 - progress * .06};--image-veil-opacity:${(1 - progress) * .82}`;
+}
 function notify(message) { toastNode.textContent = message; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastNode.textContent = ''; }, 3800); }
 async function api(path, { method = 'GET', data, token } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -165,15 +172,17 @@ function questionPage() {
   const wrongWait = state.me && state.me.wrongUntil > nowServer();
   const scoreMeter = scoreMeterValues();
   const scoreLabel = state.me?.solved ? 'Điểm nhóm đã nhận' : 'Điểm nếu trả lời đúng ngay';
+  const image = q.images?.length ? `<figure class="image-question" style="${imageRevealStyle()}"><div class="image-frame ${q.images.length > 1 ? 'image-pair' : ''}">${q.images.map((src, index) => `<img src="${esc(src)}" alt="${esc(q.imageAlt)}${q.images.length > 1 ? `, ảnh ${index + 1}` : ''}">`).join('')}<span class="image-veil" aria-hidden="true"></span></div><figcaption>Hình ảnh sẽ hiện rõ dần theo thời gian</figcaption></figure>` : '';
   const form = host ? '<p class="hint-line">Câu hỏi sẽ tự kết thúc khi hết giờ hoặc tất cả nhóm trả lời đúng.</p>' : state.me.solved ? `<div class="feedback correct">Nhóm bạn đã trả lời đúng và nhận ${state.me.roundPoints} điểm. Chờ các nhóm khác.</div>` : `<form id="answer-form" class="answer-form"><input class="input" id="answer-input" name="answer" maxlength="100" autocomplete="off" autocapitalize="sentences" placeholder="Nhập đáp án của nhóm..." aria-label="Nhập đáp án" required><button class="btn" type="submit" ${wrongWait ? 'disabled' : ''}>Trả lời →</button></form>${feedback}`;
-  const main = `<div class="panel"><div class="timer-row"><div><div class="kicker">Câu ${state.questionIndex + 1} / ${state.totalQuestions}</div><div class="muted">Mỗi giây hé một ký tự</div></div><div class="timer ${timeLeft <= 5 ? 'urgent' : ''}">${String(timeLeft).padStart(2, '0')}<small> giây</small></div></div><div class="timer-track"><div class="timer-fill" style="width:${percent}%"></div></div><div class="score-meter"><div class="score-meter-head"><span>${scoreLabel}${scoreMeter.bonus ? ' · Đã cộng 200 điểm chức năng' : ''}</span><strong class="live-score">${scoreMeter.score} điểm</strong></div><div class="score-track"><div class="score-fill" style="width:${scoreMeter.percent}%"></div></div></div><h3 class="question-heading">${esc(q.prompt)}</h3><div class="slots ${fog ? 'fogged' : ''}" aria-label="Ô chữ đáp án">${slotsHtml(q.slots)}</div>${fog ? '<p class="hint-line">Màn sương đang che ô chữ. Bạn vẫn có thể nhập đáp án.</p>' : ''}${form}</div>`;
+  const main = `<div class="panel"><div class="timer-row"><div><div class="kicker">Câu ${state.questionIndex + 1} / ${state.totalQuestions}</div><div class="muted">${q.images?.length ? 'Ảnh và ô chữ hiện rõ dần' : 'Mỗi giây hé một ký tự'}</div></div><div class="timer ${timeLeft <= 5 ? 'urgent' : ''}">${String(timeLeft).padStart(2, '0')}<small> giây</small></div></div><div class="timer-track"><div class="timer-fill" style="width:${percent}%"></div></div><div class="score-meter"><div class="score-meter-head"><span>${scoreLabel}${scoreMeter.bonus ? ' · Đã cộng 200 điểm chức năng' : ''}</span><strong class="live-score">${scoreMeter.score} điểm</strong></div><div class="score-track"><div class="score-fill" style="width:${scoreMeter.percent}%"></div></div></div><h3 class="question-heading">${esc(q.prompt)}</h3>${image}<div class="slots ${fog ? 'fogged' : ''}" aria-label="Ô chữ đáp án">${slotsHtml(q.slots)}</div>${fog ? '<p class="hint-line">Màn sương đang che ô chữ. Bạn vẫn có thể nhập đáp án.</p>' : ''}${form}</div>`;
   return page(`${intro('Giải ô chữ', 'Trả lời càng sớm, điểm càng cao.', 'Thử thách đang diễn ra')}<div class="layout"><main>${main}</main><aside><div class="panel"><div class="panel-title">${host ? 'Bảng xếp hạng' : 'Chức năng của câu này'}</div>${host ? playerList() : itemCard(item, Boolean(item))}</div>${host ? '' : `<div class="panel"><div class="panel-title">Bảng xếp hạng</div>${playerList()}</div>`}</aside></div>`, true);
 }
 function sourceHtml(q) { const href = safeHref(q.source); return href ? `<p class="source">Nguồn tham khảo: <a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(q.source)}</a></p>` : ''; }
 function revealPage() {
   const q = state.question;
   const host = state.role === 'host' || session.demo;
-  return page(`${intro('Đáp án & kết quả', 'Một chặng đã hoàn thành. Cùng nhìn lại kiến thức và điểm số.', `Câu ${state.questionIndex + 1} / ${state.totalQuestions}`)}<div class="layout"><main><div class="panel"><div class="panel-title">Đáp án chính xác</div><div class="result-answer">${esc(q.answer)}</div><p>${esc(q.explanation || 'Hãy cùng trao đổi thêm về nội dung câu hỏi.')}</p>${sourceHtml(q)}${host ? `<div class="host-actions"><button class="btn large" data-action="next">${state.questionIndex + 1 >= state.totalQuestions ? 'Xem kết quả chung cuộc →' : 'Câu tiếp theo →'}</button></div>` : '<p class="hint-line">Chờ người dẫn chuyển câu tiếp theo.</p>'}</div></main>${sidebar()}</div>`, true);
+  const image = q.images?.length ? `<figure class="image-question revealed" style="${imageRevealStyle(1)}"><div class="image-frame ${q.images.length > 1 ? 'image-pair' : ''}">${q.images.map((src, index) => `<img src="${esc(src)}" alt="${esc(q.imageAlt)}${q.images.length > 1 ? `, ảnh ${index + 1}` : ''}">`).join('')}</div><figcaption>Hình ảnh gợi ý đã được mở hoàn toàn</figcaption></figure>` : '';
+  return page(`${intro('Đáp án & kết quả', 'Một chặng đã hoàn thành. Cùng nhìn lại kiến thức và điểm số.', `Câu ${state.questionIndex + 1} / ${state.totalQuestions}`)}<div class="layout"><main><div class="panel"><div class="panel-title">Đáp án chính xác</div><div class="result-answer">${esc(q.answer)}</div>${image}<p>${esc(q.explanation || 'Hãy cùng trao đổi thêm về nội dung câu hỏi.')}</p>${sourceHtml(q)}${host ? `<div class="host-actions"><button class="btn large" data-action="next">${state.questionIndex + 1 >= state.totalQuestions ? 'Xem kết quả chung cuộc →' : 'Câu tiếp theo →'}</button></div>` : '<p class="hint-line">Chờ người dẫn chuyển câu tiếp theo.</p>'}</div></main>${sidebar()}</div>`, true);
 }
 function finalPage() {
   const winners = state.players.filter(p => p.rank === 1).map(p => esc(p.name));
@@ -218,6 +227,8 @@ function updateQuestionDynamic() {
   }
   const slots = document.querySelector('.slots');
   if (slots) { slots.innerHTML = slotsHtml(q.slots); slots.classList.toggle('fogged', Boolean(state.me && state.me.fogUntil > nowServer())); }
+  const imageQuestion = document.querySelector('.image-question');
+  if (imageQuestion) imageQuestion.setAttribute('style', imageRevealStyle());
   const submit = document.querySelector('#answer-form button[type=submit]');
   if (submit) submit.disabled = Boolean(state.me?.wrongUntil > nowServer());
 }
@@ -248,16 +259,17 @@ function openEditor() {
   drawEditor();
 }
 function drawEditor() {
-  overlay.innerHTML = `<div class="editor-backdrop"><section class="editor" role="dialog" aria-modal="true" aria-label="Chỉnh bộ câu hỏi"><div class="editor-header"><div><div class="eyebrow">Thiết lập trước trận</div><h2>Biên tập câu hỏi</h2><p class="muted">Chỉnh đáp án, cách viết tương đương và nguồn theo giáo trình của lớp.</p></div><button class="text-button" data-action="close-editor">Đóng ×</button></div><form id="editor-form"><div class="field"><label for="duration">Thời gian mỗi câu (10–90 giây)</label><input id="duration" name="duration" class="input" type="number" min="10" max="90" value="${esc(editorDuration)}" required></div><div id="editor-list">${editorQuestions.map((q, i) => `<article class="question-edit" data-index="${i}"><div class="editor-header"><h3>Câu ${i + 1}</h3><button type="button" class="text-button" data-action="remove-question" data-index="${i}" ${editorQuestions.length <= 1 ? 'disabled' : ''}>Xóa câu</button></div><div class="field"><label>Đề bài</label><textarea name="prompt" required maxlength="400">${esc(q.prompt)}</textarea></div><div class="field"><label>Đáp án</label><input class="input" name="answer" required maxlength="80" value="${esc(q.answer)}"></div><div class="field"><label>Đáp án tương đương, mỗi dòng một cách viết</label><textarea name="aliases">${esc(q.aliases.join('\n'))}</textarea></div><div class="field"><label>Giải thích khi kết thúc câu</label><textarea name="explanation" maxlength="700">${esc(q.explanation)}</textarea></div><div class="field"><label>Đường dẫn nguồn tham khảo</label><input class="input" name="source" maxlength="400" value="${esc(q.source)}"></div></article>`).join('')}</div><div class="editor-footer"><button type="button" class="btn ghost" data-action="add-question" ${editorQuestions.length >= 30 ? 'disabled' : ''}>+ Thêm câu</button><button type="submit" class="btn">Lưu bộ câu hỏi</button></div></form></section></div>`;
+  overlay.innerHTML = `<div class="editor-backdrop"><section class="editor" role="dialog" aria-modal="true" aria-label="Chỉnh bộ câu hỏi"><div class="editor-header"><div><div class="eyebrow">Thiết lập trước trận</div><h2>Biên tập câu hỏi</h2><p class="muted">Chỉnh đáp án, cách viết tương đương và nguồn theo giáo trình của lớp.</p></div><button class="text-button" data-action="close-editor">Đóng ×</button></div><form id="editor-form"><div class="field"><label for="duration">Thời gian mỗi câu (10–90 giây)</label><input id="duration" name="duration" class="input" type="number" min="10" max="90" value="${esc(editorDuration)}" required></div><div id="editor-list">${editorQuestions.map((q, i) => `<article class="question-edit" data-index="${i}"><div class="editor-header"><h3>Câu ${i + 1}${q.images?.length ? ' · Ảnh fade' : ''}</h3><button type="button" class="text-button" data-action="remove-question" data-index="${i}" ${editorQuestions.length <= 1 ? 'disabled' : ''}>Xóa câu</button></div><div class="field"><label>Đề bài</label><textarea name="prompt" required maxlength="400">${esc(q.prompt)}</textarea></div><div class="field"><label>Đáp án</label><input class="input" name="answer" required maxlength="80" value="${esc(q.answer)}"></div><div class="field"><label>Đáp án tương đương, mỗi dòng một cách viết</label><textarea name="aliases">${esc(q.aliases.join('\n'))}</textarea></div><div class="field"><label>Giải thích khi kết thúc câu</label><textarea name="explanation" maxlength="700">${esc(q.explanation)}</textarea></div><div class="field"><label>Đường dẫn nguồn tham khảo</label><input class="input" name="source" maxlength="400" value="${esc(q.source)}"></div></article>`).join('')}</div><div class="editor-footer"><button type="button" class="btn ghost" data-action="add-question" ${editorQuestions.length >= 30 ? 'disabled' : ''}>+ Thêm câu</button><button type="submit" class="btn">Lưu bộ câu hỏi</button></div></form></section></div>`;
 }
 function readEditor() {
   editorDuration = document.getElementById('duration')?.value ?? editorDuration;
-  editorQuestions = [...document.querySelectorAll('.question-edit')].map(card => ({
+  editorQuestions = [...document.querySelectorAll('.question-edit')].map((card, index) => ({
     prompt: card.querySelector('[name=prompt]').value,
     answer: card.querySelector('[name=answer]').value,
     aliases: card.querySelector('[name=aliases]').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean),
     explanation: card.querySelector('[name=explanation]').value,
-    source: card.querySelector('[name=source]').value
+    source: card.querySelector('[name=source]').value,
+    ...(editorQuestions[index]?.images?.length ? { images: [...editorQuestions[index].images], imageAlt: editorQuestions[index].imageAlt } : {})
   }));
 }
 function closeEditor() { editorOpen = false; overlay.innerHTML = ''; render(); }

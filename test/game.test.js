@@ -85,6 +85,22 @@ test('host permissions, question validation, and wheel lifecycle', () => {
   assert.throws(() => f.store.join(f.host.room.code, 'Nhóm mới'), /đã bắt đầu/);
 });
 
+test('image questions keep safe local image metadata without exposing the answer', () => {
+  let time = 1_000;
+  const imageQuestion = { prompt: 'Nhìn ảnh và trả lời?', answer: 'Bầu cử', aliases: [], explanation: 'Bỏ phiếu.', source: '', images: ['/question-images/baucu.jpg'], imageAlt: 'Hòm phiếu' };
+  const store = new GameStore({ questions: [imageQuestion], now: () => time, chooseItem: () => 'bonus' });
+  const host = store.create({ durationSec: 10 });
+  const joined = store.join(host.code, 'Sao Vàng');
+  const hostAuth = store.auth(host.code, host.token);
+  const playerAuth = store.auth(host.code, joined.token);
+  store.next(hostAuth); spinFive(store, playerAuth); store.begin(hostAuth); store.prepare(playerAuth); store.begin(hostAuth);
+  const state = store.state(playerAuth);
+  assert.deepEqual(state.question.images, ['/question-images/baucu.jpg']);
+  assert.equal(state.question.imageAlt, 'Hòm phiếu');
+  assert.equal(state.question.answer, undefined);
+  assert.throws(() => new GameStore({ questions: [{ ...imageQuestion, images: ['https://example.org/image.jpg'] }] }), /question-images/);
+});
+
 test('wrong answer cooldown, alias match, score once, and timer expiry', () => {
   const f = fixture();
   beginWithNoPerks(f);

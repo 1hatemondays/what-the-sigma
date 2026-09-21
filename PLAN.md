@@ -42,7 +42,7 @@ Agent chính: lập kế hoạch, chuẩn bị/kiểm chứng nội dung lịch 
 
 ## Kết quả triển khai
 - GPT-5.6 Sol High đã thực hiện bản ứng dụng Node.js không cần thư viện cài thêm.
-- Có phòng thật cho tối đa 20 nhóm, 8 câu hỏi mẫu có nguồn, chỉnh câu hỏi/thời gian, 5 lượt quay trước trận, kho chức năng và bước chọn chức năng trước mỗi câu, mật khẩu người dẫn, rời phòng đồng bộ, chế độ chơi thử và khôi phục phiên khi tải lại trang.
+- Có phòng thật cho tối đa 20 nhóm, 15 câu hỏi mẫu (gồm 3 câu ảnh fade), chỉnh câu hỏi/thời gian, 5 lượt quay trước trận, kho chức năng và bước chọn chức năng trước mỗi câu, mật khẩu người dẫn, rời phòng đồng bộ, chế độ chơi thử và khôi phục phiên khi tải lại trang.
 - Kiểm tra tự động bao phủ luật chơi, API, mật khẩu người dẫn và rời phòng; giao diện được kiểm tra trên laptop.
 - Chạy tại http://localhost:3000 trên máy người dẫn; đường dẫn Wi-Fi hiện trong sảnh chờ. Hướng dẫn ở README.md, có start-game.bat cho Windows.
 - Chưa có máy chủ Internet công khai. Phòng và bộ câu hỏi đã sửa lưu trong bộ nhớ, mất khi dừng/khởi động lại máy chủ.
