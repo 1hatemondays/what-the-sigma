@@ -22,6 +22,15 @@ function saveSession(value) { session = value; answerDraft = ''; targetDraft = '
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]); }
 function safeHref(value) { try { const u = new URL(value); return ['https:', 'http:'].includes(u.protocol) ? u.href : ''; } catch { return ''; } }
 function nowServer() { return Date.now() - serverOffset; }
+function liveBaseScore() {
+  const elapsed = Math.max(0, nowServer() - state.startedAt);
+  return Math.max(100, 1000 - Math.floor(900 * elapsed / (state.durationSec * 1000)));
+}
+function scoreMeterValues() {
+  const bonus = state.me?.bonusReady ? 200 : 0;
+  const score = state.me?.solved ? state.me.roundPoints : liveBaseScore() + bonus;
+  return { bonus, score, percent: Math.max(0, Math.min(100, 100 * score / (1000 + bonus))) };
+}
 function notify(message) { toastNode.textContent = message; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastNode.textContent = ''; }, 3800); }
 async function api(path, { method = 'GET', data, token } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -48,6 +57,10 @@ function openHostGate(mode) {
   const demo = mode === 'demo';
   overlay.innerHTML = `<div class="spin-modal"><section class="spin-box host-gate" role="dialog" aria-modal="true" aria-labelledby="host-gate-title"><div class="eyebrow">Dành cho người dẫn</div><h2 id="host-gate-title">${demo ? 'Mở chế độ chơi thử' : 'Tạo phòng chơi'}</h2><p>Nhập mật khẩu được hiển thị trong cửa sổ máy chủ.</p><form id="host-gate-form" data-mode="${demo ? 'demo' : 'create'}"><div class="field"><label for="host-password">Mật khẩu người dẫn</label><input id="host-password" class="input" name="password" type="password" autocomplete="current-password" required autofocus></div><div class="host-actions"><button class="btn" type="submit">${demo ? 'Bắt đầu chơi thử' : 'Tạo phòng'}</button><button class="btn ghost" type="button" data-action="close-host-gate">Hủy</button></div></form></section></div>`;
   document.getElementById('host-password')?.focus();
+}
+function openLeaveConfirm() {
+  overlay.innerHTML = `<div class="spin-modal"><section class="spin-box host-gate leave-confirm" role="dialog" aria-modal="true" aria-labelledby="leave-confirm-title"><div class="eyebrow">Xác nhận rời phòng</div><h2 id="leave-confirm-title">Bạn có chắc chắn muốn rời?</h2><p>Nếu rời phòng, <strong>điểm số và kho chức năng của nhóm sẽ bị xóa</strong> và không thể khôi phục.</p><div class="host-actions"><button class="btn ghost" type="button" data-action="cancel-leave">Ở lại phòng</button><button class="btn" type="button" data-action="confirm-leave">Rời phòng, xóa điểm</button></div></section></div>`;
+  overlay.querySelector('[data-action="cancel-leave"]')?.focus();
 }
 async function goHome() {
   const current = session;
@@ -150,8 +163,10 @@ function questionPage() {
   const item = state.me?.selectedItem;
   const feedback = state.me?.feedback ? `<div class="feedback ${esc(state.me.feedback.kind)}">${esc(state.me.feedback.text)}</div>` : '';
   const wrongWait = state.me && state.me.wrongUntil > nowServer();
+  const scoreMeter = scoreMeterValues();
+  const scoreLabel = state.me?.solved ? 'Điểm nhóm đã nhận' : 'Điểm nếu trả lời đúng ngay';
   const form = host ? '<p class="hint-line">Câu hỏi sẽ tự kết thúc khi hết giờ hoặc tất cả nhóm trả lời đúng.</p>' : state.me.solved ? `<div class="feedback correct">Nhóm bạn đã trả lời đúng và nhận ${state.me.roundPoints} điểm. Chờ các nhóm khác.</div>` : `<form id="answer-form" class="answer-form"><input class="input" id="answer-input" name="answer" maxlength="100" autocomplete="off" autocapitalize="sentences" placeholder="Nhập đáp án của nhóm..." aria-label="Nhập đáp án" required><button class="btn" type="submit" ${wrongWait ? 'disabled' : ''}>Trả lời →</button></form>${feedback}`;
-  const main = `<div class="panel"><div class="timer-row"><div><div class="kicker">Câu ${state.questionIndex + 1} / ${state.totalQuestions}</div><div class="muted">Mỗi giây hé một ký tự</div></div><div class="timer ${timeLeft <= 5 ? 'urgent' : ''}">${String(timeLeft).padStart(2, '0')}<small> giây</small></div></div><div class="timer-track"><div class="timer-fill" style="width:${percent}%"></div></div><h3 class="question-heading">${esc(q.prompt)}</h3><div class="slots ${fog ? 'fogged' : ''}" aria-label="Ô chữ đáp án">${slotsHtml(q.slots)}</div>${fog ? '<p class="hint-line">Màn sương đang che ô chữ. Bạn vẫn có thể nhập đáp án.</p>' : ''}${form}</div>`;
+  const main = `<div class="panel"><div class="timer-row"><div><div class="kicker">Câu ${state.questionIndex + 1} / ${state.totalQuestions}</div><div class="muted">Mỗi giây hé một ký tự</div></div><div class="timer ${timeLeft <= 5 ? 'urgent' : ''}">${String(timeLeft).padStart(2, '0')}<small> giây</small></div></div><div class="timer-track"><div class="timer-fill" style="width:${percent}%"></div></div><div class="score-meter"><div class="score-meter-head"><span>${scoreLabel}${scoreMeter.bonus ? ' · Đã cộng 200 điểm chức năng' : ''}</span><strong class="live-score">${scoreMeter.score} điểm</strong></div><div class="score-track"><div class="score-fill" style="width:${scoreMeter.percent}%"></div></div></div><h3 class="question-heading">${esc(q.prompt)}</h3><div class="slots ${fog ? 'fogged' : ''}" aria-label="Ô chữ đáp án">${slotsHtml(q.slots)}</div>${fog ? '<p class="hint-line">Màn sương đang che ô chữ. Bạn vẫn có thể nhập đáp án.</p>' : ''}${form}</div>`;
   return page(`${intro('Giải ô chữ', 'Trả lời càng sớm, điểm càng cao.', 'Thử thách đang diễn ra')}<div class="layout"><main>${main}</main><aside><div class="panel"><div class="panel-title">${host ? 'Bảng xếp hạng' : 'Chức năng của câu này'}</div>${host ? playerList() : itemCard(item, Boolean(item))}</div>${host ? '' : `<div class="panel"><div class="panel-title">Bảng xếp hạng</div>${playerList()}</div>`}</aside></div>`, true);
 }
 function sourceHtml(q) { const href = safeHref(q.source); return href ? `<p class="source">Nguồn tham khảo: <a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(q.source)}</a></p>` : ''; }
@@ -194,6 +209,13 @@ function updateQuestionDynamic() {
   if (timer) { timer.innerHTML = `${String(left).padStart(2, '0')}<small> giây</small>`; timer.classList.toggle('urgent', left <= 5); }
   const fill = document.querySelector('.timer-fill');
   if (fill) fill.style.width = `${Math.max(0, Math.min(100, 100 * left / state.durationSec))}%`;
+  if (!state.me?.solved) {
+    const scoreMeter = scoreMeterValues();
+    const liveScore = document.querySelector('.live-score');
+    const scoreFill = document.querySelector('.score-fill');
+    if (liveScore) liveScore.textContent = `${scoreMeter.score} điểm`;
+    if (scoreFill) scoreFill.style.width = `${scoreMeter.percent}%`;
+  }
   const slots = document.querySelector('.slots');
   if (slots) { slots.innerHTML = slotsHtml(q.slots); slots.classList.toggle('fogged', Boolean(state.me && state.me.fogUntil > nowServer())); }
   const submit = document.querySelector('#answer-form button[type=submit]');
@@ -254,9 +276,11 @@ document.addEventListener('click', async event => {
   const name = button.dataset.action;
   try {
     if (name === 'home') {
-      if (session && state?.role === 'player' && !window.confirm('Bạn có chắc chắn muốn rời phòng? Điểm số và kho chức năng của nhóm sẽ bị xóa.')) return;
+      if (session && state?.role === 'player') { openLeaveConfirm(); return; }
       button.disabled = true; await goHome(); return;
     }
+    if (name === 'cancel-leave') { overlay.innerHTML = ''; return; }
+    if (name === 'confirm-leave') { button.disabled = true; await goHome(); return; }
     if (name === 'join-screen') { history.pushState(null, '', '/join'); render(); return; }
     if (name === 'create') { openHostGate('create'); return; }
     if (name === 'demo') { openHostGate('demo'); return; }
