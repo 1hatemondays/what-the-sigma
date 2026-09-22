@@ -105,7 +105,7 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
         if (!passwordMatches(password, hostPassword)) throw new GameError('Mật khẩu người dẫn không đúng.', 403);
         return json(res, 201, store.create(options));
       }
-      const match = url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|state|leave|config|next|spin|spin-missing|prepare|prepare-missing|begin|answer))?$/);
+      const match = url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|state|leave|config|next|spin|spin-missing|prepare|prepare-missing|begin|skip|answer))?$/);
       if (!match) return json(res, 404, { error: 'Không tìm thấy trang.' });
       const [, code, action] = match;
       if (req.method === 'POST' && action === 'join') return json(res, 201, store.join(code, (await body(req)).name));
@@ -121,6 +121,7 @@ export function createAppServer({ store = new GameStore({ questions: seedQuestio
       else if (action === 'prepare') result = store.prepare(auth, await body(req));
       else if (action === 'prepare-missing') store.prepareMissing(auth);
       else if (action === 'begin') store.begin(auth);
+      else if (action === 'skip') store.skip(auth);
       else if (action === 'answer') result = store.submit(auth, (await body(req)).answer);
       else return json(res, 404, { error: 'Không tìm thấy thao tác.' });
       return json(res, 200, result);

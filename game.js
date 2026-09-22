@@ -242,6 +242,13 @@ export class GameStore {
     if (r.phase === 'question' && this.now() >= r.startedAt + r.durationSec * 1000) this.reveal(r);
   }
 
+  skip(auth) {
+    this.requireHost(auth);
+    const r = auth.room;
+    if (r.phase !== 'question') throw new GameError('Chỉ có thể bỏ qua khi câu hỏi đang diễn ra.');
+    this.reveal(r);
+  }
+
   reveal(r) { r.phase = 'reveal'; r.endedAt = this.now(); r.version++; }
 
   submit(auth, answer) {

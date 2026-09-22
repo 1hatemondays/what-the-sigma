@@ -121,6 +121,17 @@ test('wrong answer cooldown, alias match, score once, and timer expiry', () => {
   assert.equal(f.store.state(f.second).me.roundPoints, 0);
 });
 
+test('only the host can skip an active question', () => {
+  const f = fixture();
+  beginWithNoPerks(f);
+  assert.throws(() => f.store.skip(f.first), /Chỉ người dẫn/);
+  f.store.skip(f.host);
+  const state = f.store.state(f.first);
+  assert.equal(state.phase, 'reveal');
+  assert.equal(state.question.answer, 'Đường Kách mệnh');
+  assert.throws(() => f.store.skip(f.host), /đang diễn ra/);
+});
+
 test('items are private, single-use, and shield blocks targeted fog', () => {
   const f = fixture(['shield', 'bonus', 'bonus', 'bonus', 'bonus', 'fog', 'bonus', 'bonus', 'bonus', 'bonus']);
   reachPreparation(f);

@@ -69,7 +69,7 @@ export function createVercelHandler({ repository = new RedisRoomRepository(), ho
         }
         throw new GameError('Chưa tạo được mã phòng. Vui lòng thử lại.', 503);
       }
-      const match = path.match(/^rooms\/(\d{6})\/(join|state|leave|config|next|spin|spin-missing|prepare|prepare-missing|begin|answer)$/);
+      const match = path.match(/^rooms\/(\d{6})\/(join|state|leave|config|next|spin|spin-missing|prepare|prepare-missing|begin|skip|answer)$/);
       if (!match) return reply(res, 404, { error: 'Không tìm thấy trang.' });
       const [, code, action] = match;
       if ((req.method === 'GET' && action !== 'state') || (req.method === 'POST' && action === 'state') || !['GET', 'POST'].includes(req.method)) {
@@ -93,6 +93,7 @@ export function createVercelHandler({ repository = new RedisRoomRepository(), ho
           else if (action === 'prepare') result = store.prepare(auth, payload);
           else if (action === 'prepare-missing') store.prepareMissing(auth);
           else if (action === 'begin') store.begin(auth);
+          else if (action === 'skip') store.skip(auth);
           else if (action === 'answer') result = store.submit(auth, payload.answer);
         }
         const updated = store.rooms.get(code);
